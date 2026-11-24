@@ -37,7 +37,7 @@
         <div class="kpi" id="k1-mediana"></div><div class="kpi" id="k1-6m"></div><div class="kpi" id="k1-titulares"></div>
       </div>
       <article class="tarjeta">
-        <header><h3>Entidades donde los directivos duran menos</h3>
+        <header><h3 id="t1-ranking">Entidades donde los directivos duran menos</h3>
           <p>Cada barra es una entidad. Clic en una barra para filtrar todo el tablero por esa entidad.</p></header>
         <div class="controles">
           <div class="filtro-local"><span id="l1-ver">Ver por</span>
@@ -47,6 +47,7 @@
               <button type="button" data-v="titulares">Personas por puesto</button>
             </div></div>
         </div>
+        <div class="definicion" id="def1-ranking" aria-live="polite"></div>
         <div class="leyenda" id="ley1-ranking"></div>
         <div class="grafico" id="g1-ranking"></div>
         <p class="lectura" id="lec1-ranking"></p>
@@ -68,7 +69,8 @@
       </div>
       <article class="tarjeta">
         <header><h3>¿En qué años se movió cada entidad?</h3>
-          <p>Designaciones del año dividido entre todos los puestos de la entidad: 0,5 quiere decir que ese año se nombró a alguien nuevo en la mitad de sus puestos. Entre más oscuro, más cambios.</p></header>
+          <p>Designaciones por puesto en cada año. Entre más oscuro, más cambios. Pasa el mouse por una celda para ver las cifras.</p></header>
+        <div class="definicion" id="def1-calor" aria-live="polite"></div>
         <div class="grafico alto" id="g1-calor"></div>
         <p class="lectura" id="lec1-calor"></p>
       </article>
@@ -90,14 +92,18 @@
       <div class="grilla">
         <article class="tarjeta">
           <header><h3>¿Quién recibe y quién entrega funcionarios?</h3>
-            <p>Personas que llegaron menos personas que se fueron a otra entidad. A la derecha, las que reciben más de lo que entregan.</p></header>
+            <p>Solo cuenta a quienes pasan de una entidad del Estado a otra. En verde, las que reciben más funcionarios de otras entidades de los que les ceden. En rojo, las que ceden más de los que reciben.</p></header>
+          <div class="definicion" id="def2-balance" aria-live="polite"></div>
+          <div class="leyenda" id="ley2-balance"></div>
           <div class="grafico alto" id="g2-balance"></div>
           <p class="lectura" id="lec2-balance"></p>
         </article>
         <article class="tarjeta">
           <header><h3>Matriz de intercambio</h3>
-            <p>Filas: entidad de origen. Columnas: entidad de destino. Entre más oscuro, más personas.</p></header>
+            <p>Cada celda cuenta a las personas que salieron de la entidad de la fila y llegaron a la de la columna.</p></header>
+          <div class="definicion" id="def2-matriz" aria-live="polite"></div>
           <div class="grafico alto" id="g2-matriz"></div>
+          <p class="lectura" id="lec2-matriz"></p>
         </article>
       </div>
       <article class="tarjeta">
@@ -156,7 +162,7 @@
       <p class="resumen" id="r4-resumen"></p>
       <article class="tarjeta metodo-redes">
         <header><h3>¿Cómo encontramos quién llega con quién?</h3>
-          <p>Dos formas de ver que los funcionarios no rotan solos, sino en grupo.</p></header>
+          <p>Tres formas de ver que los funcionarios no rotan solos, sino en grupo.</p></header>
         <div class="pasos" id="pasos-redes"></div>
       </article>
       <div class="controles">
@@ -164,6 +170,7 @@
           <div class="segmentado claro" role="group" aria-labelledby="l4-red" id="s4-red">
             <button type="button" data-v="seguimiento">Seguimiento al jefe</button>
             <button type="button" data-v="cotraslado">Grupos que se mudan juntos</button>
+            <button type="button" data-v="relaciones">Relaciones que se repiten</button>
           </div></div>
       </div>
       <div class="kpis" style="margin-top:16px">
@@ -182,8 +189,9 @@
         </article>
       </div>
       <article class="tarjeta" id="c4-azar">
-        <header><h3>¿Es casualidad?</h3>
-          <p>Pares de personas que llegan juntas a una entidad: lo que vemos en los datos frente a 20 simulaciones en las que barajamos las fechas de llegada al azar.</p></header>
+        <header><h3 id="h4-azar">¿Es casualidad?</h3>
+          <p id="p4-azar">Pares de personas que llegan juntas a una entidad: lo que vemos en los datos frente a 20 simulaciones en las que barajamos las fechas de llegada al azar.</p></header>
+        <div class="leyenda" id="ley4-azar"></div>
         <div class="grafico bajo" id="g4-azar"></div>
         <p class="lectura" id="lec4-azar"></p>
       </article>

@@ -44,7 +44,7 @@
   let ctl = {};        // controles
 
   /* ------------------------------------------------ carga */
-  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "mecanismos", "oci"];
+  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "relaciones", "mecanismos", "oci"];
   Promise.all(ARCHIVOS.map((a) => fetch(`datos/${a}.json`).then((r) => { if (!r.ok) throw new Error(a); return r.json(); })))
     .then((res) => { ARCHIVOS.forEach((a, i) => (D[a] = res[i])); }, (e) => { mostrarError(`No se pudieron cargar los datos (${e.message}). Abre el tablero desde un servidor web, no como archivo local.`); throw e; })
     .then(iniciar)
@@ -241,7 +241,24 @@
       ordenar: false, limite: 25, formato, comparacion: "Total del Estado", nombre: { mediana: "La mitad dura", pct6: "Sale antes de 6 meses", titulares: "Personas por puesto" }[estado.metrica],
       seleccion: todasEnt() ? null : estado.ent, detalle: (d) => `${n(d.n)} periodos`, alClic: (e) => cambiar({ ent: new Set([+e]) }),
     });
-    $("#ley1-ranking").innerHTML = `<span><i style="background:${t.unica}"></i>Entidad</span><span><i class="marca" style="background:${t.navy}"></i>Total del Estado</span>`;
+    const sel = textoSeleccion();
+    $("#t1-ranking").textContent = {
+      mediana: "Entidades donde los directivos duran menos",
+      pct6: "Entidades donde más directivos salen antes de 6 meses",
+      titulares: "Entidades por donde pasan más personas por puesto",
+    }[estado.metrica];
+    $("#def1-ranking").innerHTML = {
+      mediana: `<p><b>Qué mide:</b> cuántos días pasan hasta que la mitad de los directivos de la entidad deja el cargo (la mediana de permanencia).</p>
+        <p><b>Cómo se calcula:</b> con todos los periodos en el cargo desde 2020. Los que siguen abiertos al corte también cuentan: aportan los días que llevan hasta hoy, sin suponer cuándo terminarán (método Kaplan-Meier).</p>
+        <p><b>Cómo leerlo:</b> menos días, más rotación. En ${sel} la mitad se va antes de ${fuerte(`${n(tot.med)} días`)} (unos ${n1(tot.med / 30.4)} meses).</p>`,
+      pct6: `<p><b>Qué mide:</b> qué parte de los periodos en el cargo terminó antes de cumplir 6 meses (183 días).</p>
+        <p><b>Cómo se calcula:</b> periodos cerrados con menos de 183 días ÷ todos los periodos de la entidad, incluidos los que siguen abiertos.</p>
+        <p><b>Cómo leerlo:</b> un porcentaje alto indica salidas tempranas, antes de que el directivo pueda consolidar su gestión. En ${sel}: ${fuerte(pct(tot.pct6))}. Los periodos que empezaron hace poco todavía no pueden cumplir 6 meses, así que en los gobiernos más recientes esta cifra puede verse más baja de lo que será.</p>`,
+      titulares: `<p><b>Qué mide:</b> cuántas personas distintas ocuparon, en promedio, un mismo puesto (por ejemplo, la Dirección General de Administración de un ministerio).</p>
+        <p><b>Cómo se calcula:</b> para cada puesto se cuentan las personas distintas designadas desde 2020 y se promedia entre los puestos de la entidad.</p>
+        <p><b>Cómo leerlo:</b> 1 significa que nadie cambió; 3 significa que por cada puesto pasaron tres personas. En ${sel}: ${fuerte(n1(tot.titulares))} personas por puesto.</p>`,
+    }[estado.metrica] + `<p class="nota">Solo entidades con 30 periodos o más. La marca vertical es el total del Estado con los mismos filtros.</p>`;
+    $("#ley1-ranking").innerHTML =`<span><i style="background:${t.unica}"></i>Entidad</span><span><i class="marca" style="background:${t.navy}"></i>Total del Estado</span>`;
     if (items.length) {
       const top = items[0];
       lectura("#lec1-ranking", {
@@ -281,7 +298,7 @@
       anios.forEach((a, col) => {
         const nuevos = ks.filter((k) => anioDe(P.i[k]) === a).length;
         const v = Math.round((nuevos / puestos) * 100) / 100;
-        celdas.push({ value: [col, fila, v], label: { color: v < 0.15 ? t.navy : "#fff" } });
+        celdas.push({ value: [col, fila, v], nuevos, puestos, label: { color: v < 0.3 ? t.navy : "#fff" } });
       });
     });
     if (!celdas.length) Obs.vacio("g1-calor");
@@ -291,17 +308,25 @@
       el.style.height = `${Math.max(300, candidatas.length * 30 + 90)}px`; g.resize();
       g.setOption({
         textStyle: { fontFamily: t.fuente },
-        tooltip: { ...Obs.tooltipBase(), formatter: (p) => `<strong>${esc(nombreEnt(candidatas[p.value[1]]))}</strong> · ${anios[p.value[0]]}<br>${n1(p.value[2])} designaciones por puesto` },
-        grid: { left: 150, right: 20, top: 10, bottom: 70 },
-        xAxis: { type: "category", data: anios, axisLabel: { fontSize: 14, color: t.textoSuave }, axisTick: { show: false }, splitArea: { show: false } },
+        tooltip: { ...Obs.tooltipBase(), formatter: (p) => `<strong>${esc(nombreEnt(candidatas[p.value[1]]))}</strong> · ${anios[p.value[0]]}<br>${n(p.data.nuevos)} designaciones ÷ ${n(p.data.puestos)} puestos = <strong>${n1(p.value[2])}</strong> por puesto` },
+        grid: { left: 150, right: 20, top: 34, bottom: 70 },
+        xAxis: { type: "category", position: "top", data: anios.map((a) => (a === 2026 ? "2026*" : a)), axisLabel: { fontSize: 14, color: t.textoSuave }, axisTick: { show: false }, axisLine: { show: false }, splitArea: { show: false } },
         yAxis: { type: "category", data: candidatas.map(nombreEnt), inverse: true, axisLabel: { fontSize: 14, color: t.texto, width: 140, overflow: "truncate" }, axisTick: { show: false } },
-        visualMap: { min: 0, max: 0.6, calculable: false, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 200,
-          inRange: { color: t.escala }, text: ["0,6 o más", "0"], textStyle: { fontSize: 14, color: t.textoSuave } },
+        visualMap: { min: 0, max: 1.2, calculable: false, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 200,
+          inRange: { color: t.escala }, text: ["1,2 o más", "0"], textStyle: { fontSize: 14, color: t.textoSuave } },
         series: [{ type: "heatmap", data: celdas, label: { show: el.clientWidth > 600, fontSize: 14, formatter: (p) => n1(p.value[2]) },
           itemStyle: { borderColor: "#fff", borderWidth: 2 } }],
       }, true);
-      const max = celdas.map((c) => c.value).filter((c) => c[0] < 6).reduce((a, c) => (c[2] > a[2] ? c : a));
-      lectura("#lec1-calor", `El año más movido fue ${fuerte(anios[max[0]])} en ${fuerte(nombreEnt(candidatas[max[1]]))}: ${fuerte(n1(max[2]))} designaciones por puesto. Es decir, ese año se designó a alguien en ${fuerte(pct(max[2] * 100))} de sus puestos. 2026 llega hasta el corte.`);
+      const mc = celdas.filter((c) => c.value[0] < 6).reduce((a, c) => (c.value[2] > a.value[2] ? c : a));
+      const max = mc.value, ent = nombreEnt(candidatas[max[1]]);
+      const leer = max[2] >= 1
+        ? `Hubo más designaciones que puestos (${fuerte(n1(max[2]))} por puesto): varios puestos cambiaron de titular más de una vez ese año.`
+        : `Es como si ${fuerte(pct(max[2] * 100))} de sus puestos hubiera cambiado de titular ese año.`;
+      lectura("#lec1-calor", `El año más movido fue ${fuerte(anios[max[0]])} en ${fuerte(ent)}: ${fuerte(n(mc.nuevos))} designaciones para ${n(mc.puestos)} puestos. ${leer}`);
+      $("#def1-calor").innerHTML = `<p><b>Qué mide:</b> cuántas designaciones hubo en un año por cada puesto de la entidad. Es una medida de intensidad del cambio.</p>
+        <p><b>Cómo se calcula:</b> designaciones de titulares que empezaron ese año ÷ número de puestos distintos que tuvo la entidad entre 2020 y hoy. Por ejemplo, en ${esc(ent)} en ${anios[max[0]]}: ${n(mc.nuevos)} ÷ ${n(mc.puestos)} = ${n1(max[2])}.</p>
+        <p><b>Cómo leerlo:</b> 0,5 equivale a que se renovó la mitad de los puestos. <b>Puede pasar de 1</b> porque se cuentan designaciones, no puestos: si una dirección tuvo tres titulares en el año, suma 3. Un valor mayor a 1 indica que varios puestos cambiaron más de una vez en el mismo año.</p>
+        <p class="nota">Se muestran las 20 entidades con más periodos. Respeta los filtros de nivel y gobierno. *2026 llega hasta el corte, así que todavía está incompleto.</p>`;
     }
   }
 
@@ -356,24 +381,38 @@
     }
 
     // balance
-    const bal = new Map();
-    ix.forEach((k) => { bal.set(M.b[k], (bal.get(M.b[k]) || 0) + 1); bal.set(M.a[k], (bal.get(M.a[k]) || 0) - 1); });
+    const bal = new Map(), llegan = new Map(), salen = new Map();
+    ix.forEach((k) => {
+      bal.set(M.b[k], (bal.get(M.b[k]) || 0) + 1); bal.set(M.a[k], (bal.get(M.a[k]) || 0) - 1);
+      llegan.set(M.b[k], (llegan.get(M.b[k]) || 0) + 1); salen.set(M.a[k], (salen.get(M.a[k]) || 0) + 1);
+    });
+    const ll = (e) => llegan.get(e) || 0, sa = (e) => salen.get(e) || 0;
     let bl = [...bal.entries()].filter(([e]) => todasEnt() || estado.ent.has(e)).sort((a, b) => b[1] - a[1]);
     bl = [...bl.slice(0, 10), ...bl.slice(-10)].filter((x, i, arr) => arr.findIndex((y) => y[0] === x[0]) === i && x[1] !== 0);
-    if (!bl.length) Obs.vacio("g2-balance");
+    $("#ley2-balance").innerHTML = `<span><i style="background:${t.categorias[2]}"></i>Gana gente (llegan más de los que se van)</span><span><i style="background:${t.categorias[1]}"></i>Pierde gente (se van más de los que llegan)</span>`;
+    if (!bl.length) { Obs.vacio("g2-balance"); $("#def2-balance").innerHTML = ""; }
     else {
+      const [eA, vA] = bl[0];
+      $("#def2-balance").innerHTML = `<p><b>Qué mide:</b> si una entidad atrae o pierde funcionarios frente al resto del Estado.</p>
+        <p><b>Cómo se calcula:</b> personas que llegaron desde otra entidad − personas que se fueron a otra entidad. Solo cuentan los cambios de entidad (el siguiente cargo empieza hasta un año después); los ascensos dentro de la misma entidad no entran. Por ejemplo, a ${esc(nombreEnt(eA))} llegaron ${n(ll(eA))} y se fueron ${n(sa(eA))}: saldo ${vA > 0 ? "+" : ""}${n(vA)}.</p>
+        <p><b>Cómo leerlo:</b> el saldo no quiere decir que la entidad crezca o tenga más puestos. Los puestos se llenan también con gente que entra al Estado por primera vez, y quienes se van pueden salir del Estado; esos casos no están en este gráfico. El saldo solo compara el intercambio con otras entidades. Positivo: la entidad recluta más funcionarios de otras entidades de los que les cede. Negativo: es "cantera" de otras, porque cede más de los que recibe. Un saldo cercano a 0 puede esconder mucho movimiento en ambos sentidos: pasa el mouse para ver cuántos llegan y cuántos se van.</p>
+        <p class="nota">Se muestran las 10 entidades con mayor saldo positivo y las 10 con mayor saldo negativo.</p>`;
       const g = Obs.grafico("g2-balance");
       document.getElementById("g2-balance").style.height = `${Math.max(300, bl.length * 28 + 40)}px`; g.resize();
       g.setOption({
         textStyle: { fontFamily: t.fuente },
-        tooltip: { ...Obs.tooltipBase(), trigger: "axis", axisPointer: { type: "shadow" }, formatter: (ps) => `<strong>${esc(ps[0].name)}</strong><br>${ps[0].value > 0 ? "Recibe" : "Entrega"} ${n(Math.abs(ps[0].value))} personas más de las que ${ps[0].value > 0 ? "entrega" : "recibe"}` },
+        tooltip: { ...Obs.tooltipBase(), trigger: "axis", axisPointer: { type: "shadow" }, formatter: (ps) => { const e = bl[ps[0].dataIndex][0], v = ps[0].value;
+          return `<strong>${esc(ps[0].name)}</strong><br>Llegaron desde otras entidades: ${n(ll(e))}<br>Se fueron a otras entidades: ${n(sa(e))}<br>Saldo: <strong>${v > 0 ? "+" : ""}${n(v)}</strong> (${v > 0 ? "gana" : "pierde"} ${n(Math.abs(v))} personas)`; } },
         grid: { left: 150, right: 50, top: 10, bottom: 10 },
         xAxis: { type: "value", splitLine: { lineStyle: { color: t.linea } }, axisLabel: { fontSize: 14, color: t.textoSuave } },
         yAxis: { type: "category", data: bl.map(([e]) => nombreEnt(e)), inverse: true, axisTick: { show: false }, axisLabel: { fontSize: 14, color: t.texto, width: 140, overflow: "truncate" }, axisLine: { show: false } },
         series: [{ type: "bar", barMaxWidth: 16, data: bl.map(([, v]) => ({ value: v, itemStyle: { color: v > 0 ? t.categorias[2] : t.categorias[1] } })),
           label: { show: true, position: "right", fontSize: 14, fontWeight: 700, color: t.texto, formatter: (p) => (p.value > 0 ? "+" : "") + n(p.value) } }],
       }, true);
-      lectura("#lec2-balance", `${fuerte(nombreEnt(bl[0][0]))} es la que más recibe (+${n(bl[0][1])}); ${fuerte(nombreEnt(bl[bl.length - 1][0]))} la que más entrega (${n(bl[bl.length - 1][1])}).`);
+      const [eZ, vZ] = bl[bl.length - 1];
+      lectura("#lec2-balance", vZ < 0 && vA > 0
+        ? `${fuerte(nombreEnt(eA))} es la que más gana: llegaron ${n(ll(eA))} y se fueron ${n(sa(eA))} (${fuerte(`+${n(vA)}`)}). ${fuerte(nombreEnt(eZ))} es la que más pierde: se fueron ${n(sa(eZ))} y llegaron ${n(ll(eZ))} (${fuerte(n(vZ))}).`
+        : `${fuerte(nombreEnt(eA))}: llegaron ${n(ll(eA))} y se fueron ${n(sa(eA))} (saldo ${fuerte(`${vA > 0 ? "+" : ""}${n(vA)}`)}).`);
     }
 
     // matriz
@@ -382,16 +421,26 @@
     const ejes = [...tamano.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([e]) => e);
     const celdas = [];
     lista.forEach((r) => { const i = ejes.indexOf(r.a), j = ejes.indexOf(r.b); if (i >= 0 && j >= 0) celdas.push([j, i, r.personas]); });
-    if (!celdas.length) Obs.vacio("g2-matriz");
+    if (!celdas.length) { Obs.vacio("g2-matriz"); $("#def2-matriz").innerHTML = ""; lectura("#lec2-matriz", ""); }
     else {
+      const top = celdas.reduce((a, c) => (c[2] > a[2] ? c : a));
+      const inv = celdas.find((c) => c[0] === top[1] && c[1] === top[0]);
+      const nA = nombreEnt(ejes[top[1]]), nB = nombreEnt(ejes[top[0]]);
+      $("#def2-matriz").innerHTML = `<p><b>Qué muestra:</b> todas las rutas entre las 15 entidades con más intercambio, no solo las principales del diagrama de flujos.</p>
+        <p><b>Cómo se lee:</b> busca la entidad de donde sale la gente en las <b>filas</b> (izquierda) y la entidad a donde llega en las <b>columnas</b> (abajo). La celda donde se cruzan cuenta a las personas que hicieron ese paso. Entre más oscura, más personas. Por ejemplo, la fila ${esc(nA)} con la columna ${esc(nB)}: ${n(top[2])} personas pasaron de ${esc(nA)} a ${esc(nB)}.</p>
+        <p><b>Qué buscar:</b> compara una celda con su espejo (fila y columna invertidas) para ver si el intercambio va en los dos sentidos o en uno solo. Una fila oscura indica una entidad que "exporta" a muchas; una columna oscura, una que recibe de muchas.</p>
+        <p class="nota">La diagonal queda en blanco porque no cuenta a quienes cambian de cargo dentro de la misma entidad. Las celdas en blanco son rutas sin ningún movimiento.</p>`;
+      lectura("#lec2-matriz", `La ruta más transitada es de ${fuerte(nA)} a ${fuerte(nB)}, con ${fuerte(`${n(top[2])} personas`)}. En sentido contrario pasaron ${fuerte(n(inv ? inv[2] : 0))}.`);
       const g = Obs.grafico("g2-matriz");
       g.setOption({
         textStyle: { fontFamily: t.fuente },
-        tooltip: { ...Obs.tooltipBase(), formatter: (p) => `<strong>${esc(nombreEnt(ejes[p.value[1]]))} → ${esc(nombreEnt(ejes[p.value[0]]))}</strong><br>${n(p.value[2])} personas` },
-        grid: { left: 120, right: 10, top: 10, bottom: 110 },
-        xAxis: { type: "category", data: ejes.map(nombreEnt), axisLabel: { fontSize: 14, rotate: 50, color: t.texto, width: 100, overflow: "truncate", interval: 0 }, axisTick: { show: false }, name: "Destino", nameLocation: "middle", nameGap: 95, nameTextStyle: { fontSize: 14, color: t.textoSuave } },
-        yAxis: { type: "category", data: ejes.map(nombreEnt), inverse: true, axisLabel: { fontSize: 14, color: t.texto, width: 110, overflow: "truncate", interval: 0 }, axisTick: { show: false } },
-        visualMap: { show: false, min: 0, max: Math.max(...celdas.map((c) => c[2])), inRange: { color: t.escala } },
+        tooltip: { ...Obs.tooltipBase(), formatter: (p) => `Salen de <strong>${esc(nombreEnt(ejes[p.value[1]]))}</strong><br>llegan a <strong>${esc(nombreEnt(ejes[p.value[0]]))}</strong><br>${n(p.value[2])} personas` },
+        grid: { left: 120, right: 10, top: 10, bottom: 150 },
+        xAxis: { type: "category", data: ejes.map(nombreEnt), axisLabel: { fontSize: 14, rotate: 50, color: t.texto, width: 100, overflow: "truncate", interval: 0 }, axisTick: { show: false }, name: "Llega a (columnas)", nameLocation: "middle", nameGap: 95, nameTextStyle: { fontSize: 14, color: t.textoSuave } },
+        yAxis: { type: "category", data: ejes.map(nombreEnt), inverse: true, axisLabel: { fontSize: 14, color: t.texto, width: 110, overflow: "truncate", interval: 0 }, axisTick: { show: false },
+          name: "Sale de (filas)", nameLocation: "start", nameGap: 8, nameTextStyle: { fontSize: 14, color: t.textoSuave, align: "right" } },
+        visualMap: { min: 0, max: Math.max(...celdas.map((c) => c[2])), calculable: false, orient: "horizontal", left: "center", bottom: 0, itemWidth: 12, itemHeight: 160,
+          inRange: { color: t.escala }, text: [`${n(Math.max(...celdas.map((c) => c[2])))} personas`, "1"], textStyle: { fontSize: 14, color: t.textoSuave } },
         series: [{ type: "heatmap", data: celdas, itemStyle: { borderColor: "#fff", borderWidth: 1 } }],
       }, true);
     }
@@ -502,6 +551,8 @@
         svg: `${defs}${caja(4, "A")}${caja(134, "B")}${nodo(40, 30, "var(--navy)", 11)}${nodo(170, 30, "var(--navy)", 11)}${flecha(54, 30, 154, 30)}${nodo(30, 50, "var(--azul)", 6)}${nodo(160, 50, "var(--azul)", 6)}${flecha(40, 50, 150, 50)}` },
       { t: "Grupos que se mudan juntos", p: "Personas que coincidieron en la entidad A y llegan a la misma entidad B con menos de 180 días de diferencia. Si son 3 o más, es un “episodio”.",
         svg: `${defs}${caja(4, "A")}${caja(134, "B")}${[0, 1, 2].map((i) => nodo(22 + i * 18, 40, "var(--azul)", 7) + nodo(152 + i * 18, 40, "var(--azul)", 7)).join("")}${flecha(78, 40, 140, 40)}<text x="110" y="24" text-anchor="middle" font-size="14" fill="var(--texto-suave)">≤ 180 días</text>` },
+      { t: "Relaciones que se repiten", p: "Parejas que coincidieron en dos o más entidades. En cada una vemos si uno era jefe del otro (firmó su designación, o estaba en la alta dirección o al frente de su área cuando lo designaron), si eran colegas (misma área, nivel parecido) o si solo coincidieron.",
+        svg: `${defs}${caja(4, "A")}${caja(134, "B")}${nodo(40, 26, "var(--navy)", 9)}${nodo(40, 48, "var(--azul)", 6)}<path d="M40 35v6" stroke="var(--texto-suave)" stroke-width="2"/>${nodo(158, 36, "var(--navy)", 9)}${nodo(182, 36, "var(--azul)", 9)}${flecha(64, 38, 140, 38)}` },
       { t: "¿Pasa más que por azar?", p: `Barajamos 20 veces las fechas de llegada a cada entidad, como un mazo de cartas, y contamos cuántos pares saldrían por casualidad. Si los datos reales tienen muchos más, los grupos se mueven a propósito.`,
         svg: `${[0, 1, 2, 3].map((i) => `<rect x="${60 + i * 16}" y="${18 + (i % 2) * 8}" width="44" height="62" rx="4" fill="#fff" stroke="var(--azul)" transform="rotate(${-12 + i * 8} ${82 + i * 16} 50)"/>`).join("")}` },
     ];
@@ -536,24 +587,35 @@
       });
       dibujarGrafo(nodos, aristas, [{ name: "Jefe", itemStyle: { color: t.navy } }, { name: "Persona que lo siguió", itemStyle: { color: t.categorias[0] } }], false);
       $("#ley4-red").innerHTML = `<span><i style="background:${t.navy}"></i>Jefe</span><span><i style="background:${t.categorias[0]}"></i>Persona que lo siguió</span>`;
-      // detalle
+      // detalle: con fechas (mes y año) de cada paso
+      const rutaFechas = (p) => p.e.map((e, i) => `${esc(nombreEnt(e))} (${p.f && p.f[i] != null ? fmtFecha(p.f[i]) : "s/f"})`).join(" → ");
+      const rutaJefe = (j) => {
+        const jp = (S.jp && S.jp[j]) || [];
+        return jp.length ? `<p class="etq"><b>Dónde firmó el jefe:</b> ${jp.map(([e, a, b]) => `${esc(nombreEnt(e))}, ${fmtFecha(a)}${b !== a ? ` a ${fmtFecha(b)}` : ""}`).join(" · ")}</p>` : "";
+      };
       const sel = estado.detalleRed;
       if (sel && sel.startsWith("J") && porJefe.has(+sel.slice(1))) {
         const j = +sel.slice(1), ps = porJefe.get(j);
         $("#h4-detalle").textContent = S.jefes[j];
         $("#p4-detalle").textContent = `${ps.length} personas lo siguieron`;
-        $("#d4-detalle").innerHTML = `<ul>${ps.map((p) => `<li><strong>${esc(p.s)}</strong><br><span class="etq">${p.e.map((e) => esc(nombreEnt(e))).join(" → ")}</span></li>`).join("")}</ul>`;
+        $("#d4-detalle").innerHTML = rutaJefe(j) + `<h4>Quiénes lo siguieron</h4><p class="nota">Entre paréntesis, el mes en que el jefe designó a esa persona en cada entidad.</p><ul>${[...ps].sort((a, b) => (a.f?.[0] ?? 0) - (b.f?.[0] ?? 0)).map((p) => `<li><strong>${esc(p.s)}</strong><br><span class="etq">${rutaFechas(p)}</span></li>`).join("")}</ul>`;
       } else if (sel && sel.startsWith("P")) {
         const nom = sel.slice(1), ps = pares.filter((p) => p.s === nom);
         $("#h4-detalle").textContent = nom;
         $("#p4-detalle").textContent = "Siguió a:";
-        $("#d4-detalle").innerHTML = `<ul>${ps.map((p) => `<li><strong>${esc(S.jefes[p.j])}</strong><br><span class="etq">${p.e.map((e) => esc(nombreEnt(e))).join(" → ")}</span></li>`).join("")}</ul>`;
+        $("#d4-detalle").innerHTML = ps.map((p) => `<h4>${esc(S.jefes[p.j])}</h4><p class="etq">Designado/a por este jefe: ${rutaFechas(p)}</p>${rutaJefe(p.j)}`).join("");
       } else { $("#h4-detalle").textContent = "Detalle"; $("#p4-detalle").textContent = "Elige un jefe o una persona en la red."; $("#d4-detalle").innerHTML = ""; }
       $("#h4-tabla").textContent = "Jefes con más seguidores";
       $("#p4-tabla").textContent = "Entidades por las que pasaron sus seguidores.";
       $("#t4-casos").innerHTML = `<table class="tabla"><thead><tr><th>Jefe</th><th class="num">Seguidores</th><th>Entidades</th></tr></thead><tbody>${
         jefes.slice(0, 40).map(([j, ps]) => `<tr class="clic" data-id="J${j}"><td>${esc(S.jefes[j])}</td><td class="num">${n(ps.length)}</td><td>${[...new Set(ps.flatMap((p) => p.e))].slice(0, 6).map((e) => esc(nombreEnt(e))).join(", ")}</td></tr>`).join("")}</tbody></table>`;
+    } else if (estado.red === "relaciones") {
+      dibujarRelaciones(t, G, entOk);
+      return;
     } else {
+      $("#h4-azar").textContent = "¿Es casualidad?";
+      $("#p4-azar").textContent = "Pares de personas que llegan juntas a una entidad: lo que vemos en los datos frente a 20 simulaciones en las que barajamos las fechas de llegada al azar.";
+      $("#ley4-azar").innerHTML = "";
       const C = D.cotraslado;
       const eps = C.episodios.filter((e) => estado.gob.has(e.g) && entOk([e.a, e.b]));
       const personas = eps.reduce((s, e) => s + e.n, 0);
@@ -601,6 +663,103 @@
       $("#t4-casos").innerHTML = `<table class="tabla"><thead><tr><th>Ruta</th><th class="num">Personas</th><th>Llegada</th><th>Quién firma en destino</th><th>¿El jefe también vino?</th></tr></thead><tbody>${
         eps.slice(0, 60).map((e) => `<tr class="clic" data-id="E${e.a}>E${e.b}"><td>${esc(nombreEnt(e.a))} → ${esc(nombreEnt(e.b))}</td><td class="num">${n(e.n)}</td><td>${fmtFecha(e.t)}</td><td>${esc(e.jefe)}</td><td>${e.vino ? "Sí" : "No"}</td></tr>`).join("")}</tbody></table>`;
     }
+    $("#t4-casos tbody").onclick = (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) { cambiar({ detalleRed: tr.dataset.id }); $("#h4-detalle").scrollIntoView({ behavior: "smooth", block: "center" }); } };
+  }
+
+  /* relaciones que se repiten: jefe / colega en 2+ entidades */
+  const REL_ANTES = { jefe: "Uno era jefe del otro", colega: "Eran colegas", coinciden: "Solo coincidieron" };
+  const REL_DESPUES = (a, b) => (b === "colega" ? "Colegas" : b === "coinciden" ? "Solo coinciden"
+    : a === "jefe" ? (b === "jefe" ? "El mismo sigue de jefe" : "Se invierten los papeles") : "Uno pasa a mandar al otro");
+  const REL_TIPO = (k) => { const [a, b] = k.split(">"); return `${REL_ANTES[a]} → ${REL_DESPUES(a, b).toLowerCase()}`; };
+  function dibujarRelaciones(t, G, entOk) {
+    const Rl = D.relaciones, TP = Rl.tipos, NOMS = Rl.nombres;
+    const veces = (tp) => tp.real / Math.max(tp.azar, 1);
+    const pares = Rl.pares.map((p, i) => ({ ...p, i })).filter((p) => estado.gob.has(p.g) && entOk(p.s.map((s) => s[0])));
+    const cuenta = TP.map(() => 0); pares.forEach((p) => cuenta[p.k]++);
+    const kJJ = TP.findIndex((x) => x.k === "jefe>jefe"), kCJ = TP.findIndex((x) => x.k === "colega>jefe");
+    const cerca = pares.filter((p) => p.s.every((s) => s[2] !== "coinciden")).length;
+    const filtrado = filtroEntActivo() || estado.gob.size !== G.length;
+    const R0 = Rl.resumen;
+    Obs.kpi("k4-a", { etiqueta: "El jefe vuelve a mandar al mismo", valor: n(cuenta[kJJ]), pie: `Parejas · ${n1(veces(TP[kJJ]))} veces lo esperado por azar` });
+    Obs.kpi("k4-b", { etiqueta: "Colegas que luego son jefe y subordinado", valor: n(cuenta[kCJ]), pie: `Parejas · ${n1(veces(TP[kCJ]))} veces lo esperado por azar` });
+    Obs.kpi("k4-c", { etiqueta: "Relación cercana en todas sus entidades", valor: n(cerca), pie: `Jefe o colega en cada una · ${n1(R0.cerca / R0.cerca_azar)} veces el azar` });
+    lectura("#r4-resumen", `En ${textoSeleccion()}, ${fuerte(n(cuenta[kJJ]))} parejas repiten la relación de jefe y subordinado en otra entidad, ${fuerte(`${n1(veces(TP[kJJ]))} veces`)} más de lo que daría el azar. Las redes también funcionan como escalera: ${fuerte(n(cuenta[kCJ]))} parejas que fueron colegas pasan a ser jefe y subordinado, casi el doble de lo esperado.`);
+    // sankey: relación en la 1.ª entidad → en la 2.ª (sin "solo coincidieron → solo coinciden")
+    $("#h4-red").textContent = "¿Cómo cambia la relación de una entidad a la siguiente?";
+    $("#p4-red").textContent = "Parejas que coincidieron en dos o más entidades. Izquierda: su relación en la primera; derecha: en la siguiente. En azul, los cambios que pasan claramente más que por azar (1,8 veces o más).";
+    const nodosN = new Set(), links = [];
+    TP.forEach((tp, i) => {
+      if (tp.k === "coinciden>coinciden" || !cuenta[i]) return;
+      const [a, b] = tp.k.split(">"), s = `A:${a}`, d = `D:${REL_DESPUES(a, b)}`;
+      nodosN.add(s); nodosN.add(d);
+      const fuerteT = veces(tp) >= 1.8;
+      links.push({ source: s, target: d, value: cuenta[i], k: i, lineStyle: { color: fuerteT ? t.categorias[0] : t.otros, opacity: fuerteT ? 0.55 : 0.3 } });
+    });
+    const etq = (nm) => (nm.startsWith("A:") ? REL_ANTES[nm.slice(2)] : nm.slice(2));
+    if (!links.length) Obs.vacio("g4-red");
+    else {
+      const g = Obs.grafico("g4-red");
+      g.setOption({
+        textStyle: { fontFamily: t.fuente },
+        tooltip: { ...Obs.tooltipBase(), formatter: (p) => {
+          if (p.dataType !== "edge") return `<strong>${esc(etq(p.name))}</strong><br>${n(p.value)} parejas`;
+          const tp = TP[p.data.k];
+          return `<strong>${esc(etq(p.data.source))} → ${esc(etq(p.data.target).toLowerCase())}</strong><br>${n(p.value)} parejas${filtrado ? " en esta selección" : ""}<br>Todo el Estado: ${n(tp.real)} frente a ${n(Math.round(tp.azar))} al azar (${n1(veces(tp))} veces)`;
+        } },
+        series: [{ type: "sankey", left: 10, right: 190, top: 10, bottom: 10, nodeWidth: 14, nodeGap: 14, draggable: false, layoutIterations: 0,
+          data: [...nodosN].sort((x, y) => (x < y ? -1 : 1)).map((nm) => ({ name: nm, itemStyle: { color: t.navy } })),
+          links, emphasis: { focus: "adjacency" },
+          label: { fontSize: 14, color: t.texto, formatter: (p) => etq(p.name) } }],
+      }, true);
+      g.off("click");
+      g.on("click", (p) => { if (p.dataType === "edge") cambiar({ detalleRed: `K${p.data.k}` }); });
+    }
+    $("#ley4-red").innerHTML = `<span><i style="background:${t.categorias[0]}"></i>Pasa claramente más que por azar</span><span><i style="background:${t.otros}"></i>Poco por encima del azar</span>`;
+    // detalle
+    const paso = (p, s) => {
+      const X = esc(NOMS[p.x]), Y = esc(NOMS[p.y]);
+      const rel = s[2] === "jefe" ? `${X} era jefe/a de ${Y}` : s[2] === "subord" ? `${Y} era jefe/a de ${X}` : s[2] === "colega" ? "colegas" : "coincidieron";
+      return `<li><strong>${esc(nombreEnt(s[0]))}</strong>, ${fmtFecha(s[1])}: ${rel}<br><span class="etq">${esc(s[3] || "—")} / ${esc(s[4] || "—")}</span></li>`;
+    };
+    const fichaPar = (p) => `<h4>${esc(NOMS[p.x])} y ${esc(NOMS[p.y])}</h4><ul>${p.s.map((s) => paso(p, s)).join("")}</ul>`;
+    const sel = estado.detalleRed;
+    if (sel && sel.startsWith("K")) {
+      const k = +sel.slice(1), lista = pares.filter((p) => p.k === k);
+      $("#h4-detalle").textContent = REL_TIPO(TP[k].k);
+      $("#p4-detalle").textContent = `${n(lista.length)} parejas. Se muestran hasta 25, primero las que coinciden en más entidades.`;
+      $("#d4-detalle").innerHTML = lista.slice(0, 25).map(fichaPar).join("");
+    } else if (sel && sel.startsWith("R")) {
+      const p = pares.find((x) => x.i === +sel.slice(1));
+      $("#h4-detalle").textContent = p ? `${NOMS[p.x]} y ${NOMS[p.y]}` : "Detalle";
+      $("#p4-detalle").textContent = p ? REL_TIPO(TP[p.k].k) : "";
+      $("#d4-detalle").innerHTML = p ? `<ul>${p.s.map((s) => paso(p, s)).join("")}</ul>` : "";
+    } else { $("#h4-detalle").textContent = "Detalle"; $("#p4-detalle").textContent = "Elige un flujo del diagrama o una pareja de la tabla."; $("#d4-detalle").innerHTML = ""; }
+    // azar: real frente a azar por tipo de trayectoria (todo el Estado)
+    $("#h4-azar").textContent = "¿Es casualidad?";
+    $("#p4-azar").textContent = "Parejas de cada tipo en los datos frente al promedio de 20 simulaciones en las que barajamos al azar las fechas de llegada a cada entidad. Todo el Estado; no cambia con los filtros.";
+    $("#ley4-azar").innerHTML = `<span><i style="background:${t.categorias[0]}"></i>Datos reales</span><span><i style="background:${t.otros}"></i>Promedio al azar</span>`;
+    const ord = TP.map((tp, i) => ({ ...tp, i })).filter((tp) => tp.k !== "coinciden>coinciden").sort((a, b) => veces(b) - veces(a));
+    const ga = Obs.grafico("g4-azar");
+    document.getElementById("g4-azar").style.height = `${ord.length * 44 + 30}px`; ga.resize();
+    ga.setOption({
+      textStyle: { fontFamily: t.fuente },
+      tooltip: { ...Obs.tooltipBase(), trigger: "axis", axisPointer: { type: "shadow" }, formatter: (ps) => { const tp = ord[ps[0].dataIndex]; return `<strong>${esc(REL_TIPO(tp.k))}</strong><br>Datos: ${n(tp.real)} · Azar: ${n(Math.round(tp.azar))}<br>${n1(veces(tp))} veces lo esperado`; } },
+      grid: { left: 330, right: 90, top: 4, bottom: 24 },
+      xAxis: { type: "value", axisLabel: { fontSize: 13, color: t.textoSuave, formatter: (v) => n(v) }, splitLine: { lineStyle: { color: t.linea } } },
+      yAxis: { type: "category", inverse: true, data: ord.map((tp) => REL_TIPO(tp.k)), axisTick: { show: false }, axisLabel: { fontSize: 13, color: t.texto, width: 320, overflow: "truncate" } },
+      series: [
+        { name: "Datos reales", type: "bar", barMaxWidth: 14, itemStyle: { color: t.categorias[0] }, data: ord.map((tp) => tp.real),
+          label: { show: true, position: "right", fontSize: 13, fontWeight: 700, color: t.texto, formatter: (p) => `${n1(veces(ord[p.dataIndex]))} veces` } },
+        { name: "Promedio al azar", type: "bar", barMaxWidth: 14, itemStyle: { color: t.otros }, data: ord.map((tp) => Math.round(tp.azar)) },
+      ],
+    }, true);
+    lectura("#lec4-azar", `Todas las trayectorias superan al azar, pero no por igual: que el jefe vuelva a mandar al mismo pasa ${fuerte(`${n1(veces(TP[kJJ]))} veces`)} más de lo esperado, mientras que "antes jefe, luego colegas" apenas lo supera (${n1(veces(TP[TP.findIndex((x) => x.k === "jefe>colega")]))} veces).`);
+    // tabla de parejas
+    $("#h4-tabla").textContent = "Parejas que se repiten";
+    $("#p4-tabla").textContent = "Primero las que coinciden en más entidades. Clic en una fila para ver su recorrido.";
+    const corto = (p, s) => (s[2] === "jefe" ? "jefe" : s[2] === "subord" ? "se invierte" : s[2] === "colega" ? "colegas" : "coinciden");
+    $("#t4-casos").innerHTML = `<table class="tabla"><thead><tr><th>Pareja</th><th>Qué pasó</th><th>Recorrido</th></tr></thead><tbody>${
+      pares.slice(0, 60).map((p) => `<tr class="clic" data-id="R${p.i}"><td>${esc(NOMS[p.x])}<br>${esc(NOMS[p.y])}</td><td>${esc(REL_TIPO(TP[p.k].k))}</td><td>${p.s.map((s) => `${esc(nombreEnt(s[0]))} (${corto(p, s)})`).join(" → ")}</td></tr>`).join("")}</tbody></table>`;
     $("#t4-casos tbody").onclick = (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) { cambiar({ detalleRed: tr.dataset.id }); $("#h4-detalle").scrollIntoView({ behavior: "smooth", block: "center" }); } };
   }
 
@@ -722,7 +881,7 @@
 
   /* ================================================ 7. Método */
   function pintarMetodo() {
-    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "oci"];
+    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "relaciones", "oci"];
     const corte = esc(fmtCorte(D.meta.corte));
     $("#metodo-texto").innerHTML = `
       <nav class="indice" aria-label="Contenido de la metodología">
@@ -792,11 +951,15 @@
       </dl>
 
       <h2 id="m-redes">Análisis de redes</h2>
-      <p>El firmante se extrae del cierre de cada norma ("Regístrese, comuníquese y publíquese"). Con él se arman dos redes:</p>
+      <p>El firmante se extrae del cierre de cada norma ("Regístrese, comuníquese y publíquese"). Con él y con los periodos se arman tres redes:</p>
       <dl>
         <dt>Seguimiento al jefe</dt><dd>Un jefe que firmó al menos 3 resoluciones en dos entidades distintas y designó a la misma persona en ambas: esa persona "lo siguió". El mínimo de 3 firmas evita confundir una firma suelta (por ejemplo, un encargo de un día) con un cambio real de entidad.</dd>
         <dt>Grupos que se mudan juntos (co-traslado)</dt><dd>Dos personas que coincidieron en la entidad A (sus periodos se cruzan en el tiempo) y llegan a la misma entidad B con menos de 180 días de diferencia forman un par. Las llegadas a una ruta A → B se cortan en "olas" cuando pasan más de 90 días sin llegadas. Si 3 o más personas quedan unidas dentro de una misma ola, es un <strong>episodio</strong>. Para saber si el jefe también vino, se revisa si quien firma las designaciones en B tuvo un cargo en A.</dd>
-        <dt>¿Es casualidad?</dt><dd>El azar del co-traslado se calcula barajando 20 veces las fechas de llegada a cada entidad y contando cuántos pares saldrían. Si los datos reales tienen muchos más pares que las simulaciones, los grupos se mueven a propósito.</dd>
+        <dt>Relaciones que se repiten</dt><dd>Parejas de personas cuyos periodos se cruzaron al menos 30 días en dos o más entidades. En cada entidad se anota la relación más cercana que tuvieron:
+          <strong>jefe y subordinado</strong>, si uno firmó la designación del otro o, cuando la firma no se pudo leer, si uno era titular de la alta dirección (ministro, viceministro, secretario general o titular de la entidad) o titular de un nivel superior en la misma área cuando designaron al otro (los asesores no cuentan como jefes);
+          <strong>colegas</strong>, si estaban en la misma área (el mismo programa, la misma familia de oficinas como administración o planeamiento, o el mismo órgano de línea) con a lo más un nivel de diferencia; o
+          <strong>solo coincidieron</strong>. Luego se compara la relación en la primera entidad con la de la siguiente (por ejemplo, colegas que pasan a ser jefe y subordinado). "Jefe" es una inferencia: estar en la alta dirección cuando designan a alguien no prueba que esa persona lo haya elegido.</dd>
+        <dt>¿Es casualidad?</dt><dd>El azar del co-traslado y de las relaciones se calcula barajando 20 veces las fechas de llegada a cada entidad y contando cuántos pares saldrían. Si los datos reales tienen muchos más pares que las simulaciones, los grupos se mueven a propósito.</dd>
       </dl>
 
       <h2 id="m-oci">Órganos de Control Institucional (OCI)</h2>

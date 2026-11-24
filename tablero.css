@@ -8,7 +8,7 @@
 .detalle .etq { display: inline-block; font-size: 14px; font-weight: 700; color: var(--texto-suave); }
 
 /* Método de redes: 3 pasos con dibujo */
-.pasos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.pasos { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
 .paso { border: 1px solid var(--linea); border-radius: var(--radio); padding: 14px 16px; background: var(--fondo); }
 .paso .num { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 14px; }
 .paso h4 { margin: 8px 0 4px; font-size: 17px; color: var(--navy); }
@@ -74,3 +74,12 @@
 .texto-metodo .tabla { margin: 8px 0 4px; }
 .texto-metodo ol, .texto-metodo ul { padding-left: 22px; }
 .texto-metodo li { margin: 4px 0; }
+
+/* definición dinámica del indicador (ranking) */
+.definicion { margin: 14px 0 6px; padding: 12px 16px; background: var(--fondo); border-left: 4px solid var(--azul); border-radius: 6px; font-size: 15px; line-height: 1.5; color: var(--texto); }
+.definicion p { margin: 0 0 6px; }
+.definicion p:last-child { margin-bottom: 0; }
+.definicion b { color: var(--navy); }
+.definicion .nota { font-size: 13px; color: var(--texto-suave); }
+.definicion:empty { display: none; }
+#d4-detalle .nota { font-size: 13px; color: var(--texto-suave); margin: 0 0 6px; }
