@@ -803,7 +803,7 @@
       <p>Los jefes de OCI los designa la Contraloría, no la entidad, y se analizan en su propia pestaña. La sede de cada OCI se saca del texto de la norma: sin ella, cientos de OCI distintos quedarían como un solo puesto y parecería que se reemplazan entre sí.</p>
 
       <h2>Qué no incluye</h2>
-      <p>Los ministros (se analizan aparte), el Poder Judicial, el Ministerio Público, los representantes ante comisiones, consejos y grupos de trabajo, los responsables de transparencia, los fedatarios, los prefectos y subprefectos. Los directorios y consejos directivos sí se incluyen. Tampoco hay contratos CAS ni locadores: solo lo que se publica en El Peruano.</p>
+      <p>Los ministros (se analizan aparte), el Poder Judicial, el Ministerio Público, los representantes ante comisiones, consejos y grupos de trabajo, los responsables de transparencia, los fedatarios, los prefectos y subprefectos, y el servicio exterior (embajadores, cónsules, incluidos los honorarios, agregados y representantes permanentes). Los diplomáticos de carrera que ocupan cargos en la Cancillería, como viceministro, secretario general o director, sí se incluyen. Los directorios y consejos directivos sí se incluyen. Tampoco hay contratos CAS ni locadores: solo lo que se publica en El Peruano.</p>
 
       <h2 id="m-limites">Limitaciones</h2>
       <ul>
