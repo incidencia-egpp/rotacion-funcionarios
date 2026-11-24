@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rotación de funcionarios del Estado</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="comun/tema.css">
+  <link rel="stylesheet" href="comun/estilos.css">
+  <link rel="stylesheet" href="tablero.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"></script>
+</head>
+<body>
+  <header class="cabecera">
+    <div class="cabecera-interior">
+      <div>
+        <h1>¿Cuánto duran los funcionarios en sus <span class="destacada">cargos</span>?</h1>
+        <p class="subtitulo">Designaciones y salidas de directivos publicadas en El Peruano, enero 2020 – <span id="corte"></span></p>
+      </div>
+      <a class="boton boton-lima" href="#metodo" data-ir="metodo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></svg>Descargar datos
+      </a>
+    </div>
+  </header>
+  <div class="filtros" id="filtros" aria-label="Filtros"></div>
+  <nav class="modulos" id="modulos" role="tablist" aria-label="Temas del tablero"></nav>
+
+  <main id="contenido">
+    <p class="aviso error-carga" id="error" hidden></p>
+
+    <!-- 1. Dónde se rota más -->
+    <section data-modulo="rotacion" hidden>
+      <p class="resumen" id="r1-resumen"></p>
+      <div class="kpis">
+        <div class="kpi" id="k1-mediana"></div><div class="kpi" id="k1-6m"></div><div class="kpi" id="k1-titulares"></div>
+      </div>
+      <article class="tarjeta">
+        <header><h3>Entidades donde los directivos duran menos</h3>
+          <p>Cada barra es una entidad. Clic en una barra para filtrar todo el tablero por esa entidad.</p></header>
+        <div class="controles">
+          <div class="filtro-local"><span id="l1-ver">Ver por</span>
+            <div class="segmentado claro" role="group" aria-labelledby="l1-ver" id="s1-metrica">
+              <button type="button" data-v="mediana">Días que dura la mitad</button>
+              <button type="button" data-v="pct6">% que sale antes de 6 meses</button>
+              <button type="button" data-v="titulares">Personas por puesto</button>
+            </div></div>
+        </div>
+        <div class="leyenda" id="ley1-ranking"></div>
+        <div class="grafico" id="g1-ranking"></div>
+        <p class="lectura" id="lec1-ranking"></p>
+        <p class="pista">Solo entidades con al menos 30 periodos en la selección. La marca vertical es el total del Estado.</p>
+      </article>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>¿Cuántos siguen en el cargo después de…?</h3>
+            <p>Porcentaje de directivos que aún están en su puesto según los meses que pasaron desde su designación.</p></header>
+          <div class="grafico" id="g1-curva"></div>
+          <p class="lectura" id="lec1-curva"></p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>¿Qué tipo de oficina rota más?</h3>
+            <p>Días que dura la mitad de los directivos, por función de la oficina.</p></header>
+          <div class="grafico" id="g1-familia"></div>
+          <p class="lectura" id="lec1-familia"></p>
+        </article>
+      </div>
+      <article class="tarjeta">
+        <header><h3>¿En qué años se movió cada entidad?</h3>
+          <p>Designaciones del año dividido entre todos los puestos de la entidad: 0,5 quiere decir que ese año se nombró a alguien nuevo en la mitad de sus puestos. Entre más oscuro, más cambios.</p></header>
+        <div class="grafico alto" id="g1-calor"></div>
+        <p class="lectura" id="lec1-calor"></p>
+      </article>
+    </section>
+
+    <!-- 2. Intercambio -->
+    <section data-modulo="intercambio" hidden>
+      <p class="resumen" id="r2-resumen"></p>
+      <div class="kpis">
+        <div class="kpi" id="k2-mov"></div><div class="kpi" id="k2-personas"></div><div class="kpi" id="k2-par"></div>
+      </div>
+      <article class="tarjeta">
+        <header><h3>¿De dónde salen y a dónde llegan?</h3>
+          <p>A la izquierda, la entidad donde estaba la persona; a la derecha, la entidad a la que pasó (en menos de un año). El grosor es el número de personas.</p></header>
+        <div class="grafico alto" id="g2-sankey"></div>
+        <p class="lectura" id="lec2-sankey"></p>
+        <p class="pista">Se muestran las 20 rutas con más personas. Pasa el mouse para ver el detalle.</p>
+      </article>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>¿Quién recibe y quién entrega funcionarios?</h3>
+            <p>Personas que llegaron menos personas que se fueron a otra entidad. A la derecha, las que reciben más de lo que entregan.</p></header>
+          <div class="grafico alto" id="g2-balance"></div>
+          <p class="lectura" id="lec2-balance"></p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>Matriz de intercambio</h3>
+            <p>Filas: entidad de origen. Columnas: entidad de destino. Entre más oscuro, más personas.</p></header>
+          <div class="grafico alto" id="g2-matriz"></div>
+        </article>
+      </div>
+      <article class="tarjeta">
+        <header><h3>Rutas con más personas</h3><p>Clic en una ruta para ver quiénes se movieron.</p></header>
+        <div class="tabla-caja" id="t2-rutas"></div>
+        <div id="d2-ruta"></div>
+      </article>
+    </section>
+
+    <!-- 3. Cómo funcionan -->
+    <section data-modulo="mecanismos" hidden>
+      <p class="resumen" id="r3-resumen"></p>
+      <div class="kpis">
+        <div class="kpi" id="k3-sg30"></div><div class="kpi" id="k3-sg90"></div><div class="kpi" id="k3-ritmo"></div>
+      </div>
+      <article class="tarjeta">
+        <header><h3>Designaciones y salidas mes a mes</h3>
+          <p>Las bandas de fondo marcan cada gobierno. Arrastra la barra de abajo para acercarte a un periodo.</p></header>
+        <div class="grafico alto" id="g3-mensual"></div>
+        <p class="lectura" id="lec3-mensual"></p>
+      </article>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>Llega un nuevo ministro: ¿qué cambia primero?</h3>
+            <p>Cuántas veces más designaciones hay en cada tipo de oficina en los 60 días siguientes a la llegada de un ministro, frente a un periodo normal.</p></header>
+          <div class="grafico" id="g3-tras"></div>
+          <p class="lectura" id="lec3-tras"></p>
+          <p class="aviso">Ministerios del Poder Ejecutivo. No cambia con los filtros.</p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>¿Cómo termina un periodo en el cargo?</h3>
+            <p>Distribución de las salidas según el gobierno en que empezó el periodo.</p></header>
+          <div class="grafico" id="g3-motivo"></div>
+          <div class="leyenda" id="ley3-motivo"></div>
+          <p class="lectura" id="lec3-motivo"></p>
+        </article>
+      </div>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>Ritmo de los primeros días de cada gobierno</h3>
+            <p id="p3-ritmo">Designaciones por día en los primeros días de cada gobierno.</p></header>
+          <div class="grafico bajo" id="g3-ritmo"></div>
+          <p class="lectura" id="lec3-ritmo"></p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>¿Los designados ya estaban en el Estado?</h3>
+            <p>Porcentaje de personas designadas en cada gobierno que ya habían tenido un cargo antes en la base.</p></header>
+          <div class="grafico bajo" id="g3-cont"></div>
+          <p class="lectura" id="lec3-cont"></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- 4. Redes -->
+    <section data-modulo="redes" hidden>
+      <p class="resumen" id="r4-resumen"></p>
+      <article class="tarjeta metodo-redes">
+        <header><h3>¿Cómo encontramos quién llega con quién?</h3>
+          <p>Dos formas de ver que los funcionarios no rotan solos, sino en grupo.</p></header>
+        <div class="pasos" id="pasos-redes"></div>
+      </article>
+      <div class="controles">
+        <div class="filtro-local"><span id="l4-red">Tipo de red</span>
+          <div class="segmentado claro" role="group" aria-labelledby="l4-red" id="s4-red">
+            <button type="button" data-v="seguimiento">Seguimiento al jefe</button>
+            <button type="button" data-v="cotraslado">Grupos que se mudan juntos</button>
+          </div></div>
+      </div>
+      <div class="kpis" style="margin-top:16px">
+        <div class="kpi" id="k4-a"></div><div class="kpi" id="k4-b"></div><div class="kpi" id="k4-c"></div>
+      </div>
+      <div class="grilla red-grilla">
+        <article class="tarjeta">
+          <header><h3 id="h4-red">La red</h3><p id="p4-red"></p></header>
+          <div class="grafico red" id="g4-red"></div>
+          <div class="leyenda" id="ley4-red"></div>
+          <p class="pista">Clic en un punto o una línea para ver el detalle. Rueda del mouse para acercar.</p>
+        </article>
+        <article class="tarjeta">
+          <header><h3 id="h4-detalle">Detalle</h3><p id="p4-detalle">Elige un punto de la red.</p></header>
+          <div id="d4-detalle" class="detalle"></div>
+        </article>
+      </div>
+      <article class="tarjeta" id="c4-azar">
+        <header><h3>¿Es casualidad?</h3>
+          <p>Pares de personas que llegan juntas a una entidad: lo que vemos en los datos frente a 20 simulaciones en las que barajamos las fechas de llegada al azar.</p></header>
+        <div class="grafico bajo" id="g4-azar"></div>
+        <p class="lectura" id="lec4-azar"></p>
+      </article>
+      <article class="tarjeta">
+        <header><h3 id="h4-tabla">Casos</h3><p id="p4-tabla"></p></header>
+        <div class="tabla-caja" id="t4-casos"></div>
+      </article>
+    </section>
+
+    <!-- 5. Casos -->
+    <section data-modulo="casos" hidden>
+      <p class="resumen" id="r5-resumen"></p>
+      <div class="casos" id="c5-tarjetas"></div>
+      <article class="tarjeta">
+        <header><h3>Trayectoria de una persona</h3>
+          <p>Cada bloque es un cargo. El color indica la entidad y el largo, cuánto duró.</p></header>
+        <div class="controles">
+          <div class="filtro-local"><label for="i5-buscar">Buscar persona</label>
+            <input id="i5-buscar" class="buscador" list="l5-personas" placeholder="Escribe un nombre…" autocomplete="off">
+            <datalist id="l5-personas"></datalist></div>
+          <div class="filtro-local"><label for="s5-orden">Mostrar</label>
+            <select id="s5-orden" class="select-claro">
+              <option value="n">Más cargos</option><option value="ne">Más entidades</option><option value="r2">Más cargos en 2 años</option>
+            </select></div>
+        </div>
+        <div class="lista-personas" id="l5-lista"></div>
+        <h4 class="nombre-persona" id="h5-persona"></h4>
+        <div class="grafico" id="g5-gantt"></div>
+        <div class="leyenda" id="ley5-gantt"></div>
+        <div class="tabla-caja" id="t5-periodos"></div>
+      </article>
+    </section>
+
+    <!-- 6. OCI -->
+    <section data-modulo="oci" hidden>
+      <p class="resumen" id="r6-resumen"></p>
+      <div class="kpis">
+        <div class="kpi" id="k6-jefes"></div><div class="kpi" id="k6-mediana"></div><div class="kpi" id="k6-sedes"></div>
+      </div>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>¿Cuánto dura un jefe de OCI según dónde está?</h3>
+            <p>Días que dura la mitad de los jefes de OCI, por tipo de sede.</p></header>
+          <div class="grafico" id="g6-tipo"></div>
+          <p class="lectura" id="lec6-tipo"></p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>¿Cuántos jefes tuvo cada sede?</h3>
+            <p>Número de sedes según cuántos jefes de OCI distintos pasaron por ellas.</p></header>
+          <div class="grafico" id="g6-jefes"></div>
+          <p class="lectura" id="lec6-jefes"></p>
+        </article>
+      </div>
+      <article class="tarjeta">
+        <header><h3>Designaciones de jefes de OCI por mes</h3>
+          <p>Los picos son olas de reasignación decididas por la Contraloría.</p></header>
+        <div class="grafico" id="g6-mensual"></div>
+      </article>
+    </section>
+
+    <!-- 7. Método -->
+    <section data-modulo="metodo" hidden>
+      <div id="metodo-texto" class="texto-metodo"></div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p><strong>Fuente:</strong> Diario Oficial El Peruano (normas legales: resoluciones de designación, conclusión y renuncia), 2020–2026. Elaboración propia.</p>
+    <ul class="notas">
+      <li>No incluye Poder Judicial, Ministerio Público, comisiones ni comités, prefectos, fedatarios ni responsables de transparencia. Los ministros se analizan aparte.</li>
+      <li>"La mitad dura X días" cuenta también a quienes siguen en el cargo (método de Kaplan-Meier).</li>
+    </ul>
+    <p><strong>Cómo citar:</strong> Observatorio (2026). <em>Rotación de funcionarios del Estado peruano, 2020–2026</em>. Corte: <span id="corte-pie"></span>.</p>
+  </footer>
+
+  <script src="comun/util.js"></script>
+  <script src="comun/graficos.js"></script>
+  <script src="comun/filtros.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
