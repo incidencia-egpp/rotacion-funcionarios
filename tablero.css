@@ -65,3 +65,12 @@
 #f-nivel.no-aplica .segmentado { opacity: 0.55; pointer-events: none; }
 #f-nivel.no-aplica .nota-filtro { position: absolute; top: 100%; left: 0; margin-top: 4px; white-space: nowrap; }
 #f-nivel { position: relative; }
+
+/* Índice de la metodología */
+.indice { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 8px; padding: 12px 14px; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio); }
+.indice a { font-size: 14px; font-weight: 700; color: var(--azul); text-decoration: none; padding: 4px 6px; }
+.indice a:hover { text-decoration: underline; }
+.texto-metodo h2 { scroll-margin-top: 220px; }
+.texto-metodo .tabla { margin: 8px 0 4px; }
+.texto-metodo ol, .texto-metodo ul { padding-left: 22px; }
+.texto-metodo li { margin: 4px 0; }

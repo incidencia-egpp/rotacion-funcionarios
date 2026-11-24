@@ -723,28 +723,118 @@
   /* ================================================ 7. Método */
   function pintarMetodo() {
     const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "oci"];
+    const corte = esc(fmtCorte(D.meta.corte));
     $("#metodo-texto").innerHTML = `
-      <h2>¿Qué medimos?</h2>
-      <p>Cada vez que el Estado nombra a un directivo de confianza (un director, un jefe de oficina, un asesor) o le pone fin a su cargo, publica una resolución en el diario oficial <em>El Peruano</em>. Leímos todas las resoluciones de designación, conclusión y renuncia publicadas desde el 1 de enero de 2020 hasta el ${esc(fmtCorte(D.meta.corte))} y armamos, para cada persona, la lista de cargos que ocupó, cuándo empezó y cuándo terminó.</p>
-      <h2>Conceptos</h2>
+      <nav class="indice" aria-label="Contenido de la metodología">
+        <a href="#m-que">Qué medimos</a><a href="#m-fuente">Fuente</a><a href="#m-eventos">Eventos</a><a href="#m-dedup">Duplicados</a>
+        <a href="#m-estandar">Estandarización</a><a href="#m-periodos">Periodos</a><a href="#m-medidas">Medidas</a>
+        <a href="#m-mecanismos">Mecanismos</a><a href="#m-redes">Redes</a><a href="#m-oci">OCI</a><a href="#m-limites">Límites</a>
+        <a href="#m-glosario">Glosario</a><a href="#descargas">Descargas</a>
+      </nav>
+
+      <h2 id="m-que">¿Qué medimos?</h2>
+      <p>Cada vez que el Estado nombra a un directivo de confianza (un director, un jefe de oficina, un asesor) o le pone fin a su cargo, publica una resolución en el diario oficial <em>El Peruano</em>. Leímos esas resoluciones desde el 1 de enero de 2020 hasta el ${corte} y armamos, para cada persona, la lista de cargos que ocupó, cuándo empezó y cuándo terminó. Con eso medimos cuánto duran las personas en sus cargos, entre qué entidades se mueven y si se mueven solas o en grupo.</p>
+
+      <h2 id="m-fuente">Fuente</h2>
+      <p>Resoluciones publicadas en <em>El Peruano</em> desde el 01/01/2020: el buscador de normas, la página de designaciones y los PDF del diario. Los artículos que el extractor no pudo leer los procesaron agentes de IA con un validador automático que exige que el nombre y el cargo aparezcan literalmente en la norma. Lo que el validador rechaza en dos pasadas pasa a revisión humana.</p>
+
+      <h2 id="m-eventos">De la resolución al evento</h2>
+      <p>Una resolución puede traer varias decisiones: por ejemplo, el artículo 1 da por concluida la designación de una persona y el artículo 2 designa a otra en el mismo cargo. Cada decisión sobre una persona es un <strong>evento</strong>, y cada evento tiene un tipo de acción:</p>
+      <table class="tabla"><thead><tr><th>Tipo de acción</th><th>Qué dice la norma</th><th>Qué hace con el periodo</th></tr></thead><tbody>
+        <tr><td>Designación</td><td>"Designar a…", "nombrar a…" en un cargo de confianza</td><td>Abre un periodo</td></tr>
+        <tr><td>Encargatura</td><td>"Encargar las funciones de…" mientras no hay titular</td><td>Abre un periodo temporal (no cuenta para las duraciones)</td></tr>
+        <tr><td>Ratificación</td><td>Confirma en el cargo a quien ya estaba</td><td>Abre o continúa un periodo</td></tr>
+        <tr><td>Cese de designación</td><td>"Dar por concluida la designación de…"</td><td>Cierra el periodo</td></tr>
+        <tr><td>Renuncia</td><td>"Aceptar la renuncia de…"</td><td>Cierra el periodo</td></tr>
+        <tr><td>Cese de encargatura</td><td>"Dar por concluido el encargo de…"</td><td>Cierra el periodo temporal</td></tr>
+      </tbody></table>
+
+      <h2 id="m-dedup">Cómo evitamos contar dos veces</h2>
+      <p>La misma norma puede llegar por varias fuentes (buscador, página de designaciones, PDF). Al juntar los datos, dos filas son el mismo evento si coinciden en <strong>resolución + persona + tipo de acción + puesto + entidad</strong>. Se usan los cinco elementos para no perder a quien, en una misma norma, deja un cargo y es designado en otro, o a quien es designado en dos puestos a la vez (por ejemplo, un coordinador en tres unidades territoriales).</p>
+
+      <h2 id="m-estandar">Estandarización</h2>
+      <p>Se unificaron entidades, cargos (nivel J1 a J7), oficinas (familia funcional) y personas (las variantes de un mismo nombre cuentan como una persona; nunca se unen dos DNI distintos).</p>
       <dl>
-        <dt>Periodo en el cargo</dt><dd>El tiempo entre la designación de una persona en un puesto y su salida (renuncia, conclusión, llegada de un reemplazo o paso a otro cargo).</dd>
-        <dt>"La mitad dura X días"</dt><dd>Es la mediana de permanencia. Como muchas personas siguen en su cargo, no sabemos aún cuánto durarán; el método de Kaplan-Meier las cuenta mientras siguen, sin inventarles una fecha de salida.</dd>
-        <dt>Personas por puesto</dt><dd>Cuántas personas distintas ocuparon el mismo puesto (misma entidad, oficina y cargo) en la selección.</dd>
-        <dt>Niveles</dt><dd><strong>Alta dirección</strong>: viceministros, secretarios generales y jefes de entidad. <strong>Directores generales</strong>: jefes de órganos. <strong>Asesores</strong>. <strong>Jefes de unidad</strong>: directores y jefes de oficina.</dd>
-        <dt>Cambio de entidad</dt><dd>Una persona deja un cargo en una entidad y en menos de un año asume otro en una entidad distinta.</dd>
-        <dt>Seguimiento</dt><dd>Un jefe que firmó al menos 3 resoluciones en dos entidades designó a la misma persona en ambas.</dd>
-        <dt>Co-traslado</dt><dd>Personas que coincidieron en una entidad y llegaron a otra con menos de 180 días de diferencia. Con 3 o más, es un episodio. Se compara con 20 simulaciones en las que se barajan las fechas de llegada.</dd>
+        <dt>Entidad</dt><dd>Las distintas formas de escribir una institución se agrupan en una sola entidad, con su sigla y su tipo (ministerio, organismo adscrito, organismo autónomo, programa, gobierno regional, municipalidad). Los organismos adscritos cuentan aparte de su ministerio.</dd>
+        <dt>Cargo</dt><dd>Se separa el puesto de la oficina ("Director de la Oficina de Administración" pasa a cargo "Director" y oficina "Oficina de Administración") y se unifican género y categorías. Cada cargo recibe un nivel: J1 ministro, J2 viceministro, J3 secretario general o jefe de entidad, J4 director general, J5 asesor, J6 jefe de unidad o director, J7 subunidad.</dd>
+        <dt>Oficina</dt><dd>Se agrupan las escrituras de una misma oficina dentro de cada entidad y se le asigna una familia funcional (administración, asesoría jurídica, planeamiento, recursos humanos, comunicaciones, órganos de línea…), para poder comparar oficinas entre entidades.</dd>
+        <dt>Persona</dt><dd>Cada persona tiene un código estable. Se unen variantes por tildes, orden, segundo nombre o tipeo; si dos registros tienen DNI distinto, nunca se unen.</dd>
+        <dt>Puesto</dt><dd>Entidad + oficina + cargo (+ lugar, cuando es una sede desconcentrada).</dd>
       </dl>
+
+      <h2 id="m-periodos">Periodos en el cargo</h2>
+      <p>Un periodo empieza con una designación o un encargo y termina con un cese, una renuncia, la designación de un sucesor en el mismo puesto o la designación de la persona en otro cargo. Los que siguen abiertos al corte se tratan como censurados. En detalle:</p>
+      <ol>
+        <li><strong>Cese o renuncia publicados</strong>: se busca la salida de esa persona en ese mismo puesto; si la oficina está escrita distinto, se acepta la más parecida dentro de la misma entidad.</li>
+        <li><strong>Llegó un reemplazo</strong>: si no se publicó la salida, el periodo se cierra cuando otra persona es designada en el mismo puesto. Solo vale para puestos de un único ocupante.</li>
+        <li><strong>Pasó a otro cargo</strong>: si la persona es designada en otro puesto titular, el periodo anterior se cierra ahí (solo si eso ocurre al menos 30 días antes que la otra salida posible).</li>
+        <li><strong>Sigue en el cargo</strong>: si nada de lo anterior ocurre, el periodo queda abierto al ${corte}.</li>
+      </ol>
+      <p>Dos periodos seguidos de la misma persona en el mismo puesto, separados por 15 días o menos, se unen en uno. Las encargaturas no cuentan para las duraciones.</p>
+      <p><strong>Fechas.</strong> Se usa la fecha de efectividad ("a partir del…") cuando la norma la indica; si no, la de publicación.</p>
+
+      <h2 id="m-medidas">Cómo medimos la rotación</h2>
+      <dl>
+        <dt>"La mitad dura X días"</dt><dd>Es la mediana de permanencia en el cargo. Como muchos siguen en su puesto, no sabemos aún cuánto durarán; el método de Kaplan-Meier los cuenta mientras siguen, sin inventarles una salida. Solo entran puestos de un único ocupante, con la designación observada desde 2020.</dd>
+        <dt>% que sale antes de 6 meses</dt><dd>Periodos que terminaron antes de 183 días, sobre el total de periodos de la selección.</dd>
+        <dt>Personas por puesto</dt><dd>Cuántas personas distintas ocuparon el mismo puesto en la selección.</dd>
+        <dt>Designaciones por puesto (mapa de calor)</dt><dd>Designaciones de un año divididas entre todos los puestos de la entidad desde 2020.</dd>
+        <dt>Cambio de entidad</dt><dd>Una persona deja un cargo en una entidad y, en menos de un año, asume otro en una entidad distinta.</dd>
+        <dt>Cómo termina un periodo</dt><dd>Renunció, le dieron por concluida la designación, llegó un reemplazo, pasó a otro cargo o sigue en el cargo.</dd>
+      </dl>
+
+      <h2 id="m-mecanismos">Cómo funcionan las rotaciones</h2>
+      <dl>
+        <dt>Llega un nuevo ministro</dt><dd>El buscador de El Peruano no devuelve todos los nombramientos de ministros de 2023 y 2025, así que la llegada de cada ministro se reconstruye con la primera resolución que firma como ministro (con al menos 3 firmadas). Luego se cuentan las designaciones en cada tipo de oficina en los 60 días siguientes y se comparan con el ritmo normal de esa oficina: "2 veces" quiere decir el doble de lo habitual. Los ministros no se muestran en el tablero: esa información se analiza aparte.</dd>
+        <dt>Cambio de secretario general</dt><dd>Porcentaje de llegadas de ministros tras las que se designa un nuevo secretario general en 30 y en 90 días.</dd>
+        <dt>Ritmo de los primeros días</dt><dd>Designaciones por día en los primeros N días de cada gobierno, donde N es lo que lleva el gobierno actual.</dd>
+        <dt>¿Ya estaban en el Estado?</dt><dd>Personas designadas en un gobierno que ya habían tenido un cargo antes en la base.</dd>
+      </dl>
+
+      <h2 id="m-redes">Análisis de redes</h2>
+      <p>El firmante se extrae del cierre de cada norma ("Regístrese, comuníquese y publíquese"). Con él se arman dos redes:</p>
+      <dl>
+        <dt>Seguimiento al jefe</dt><dd>Un jefe que firmó al menos 3 resoluciones en dos entidades distintas y designó a la misma persona en ambas: esa persona "lo siguió". El mínimo de 3 firmas evita confundir una firma suelta (por ejemplo, un encargo de un día) con un cambio real de entidad.</dd>
+        <dt>Grupos que se mudan juntos (co-traslado)</dt><dd>Dos personas que coincidieron en la entidad A (sus periodos se cruzan en el tiempo) y llegan a la misma entidad B con menos de 180 días de diferencia forman un par. Las llegadas a una ruta A → B se cortan en "olas" cuando pasan más de 90 días sin llegadas. Si 3 o más personas quedan unidas dentro de una misma ola, es un <strong>episodio</strong>. Para saber si el jefe también vino, se revisa si quien firma las designaciones en B tuvo un cargo en A.</dd>
+        <dt>¿Es casualidad?</dt><dd>El azar del co-traslado se calcula barajando 20 veces las fechas de llegada a cada entidad y contando cuántos pares saldrían. Si los datos reales tienen muchos más pares que las simulaciones, los grupos se mueven a propósito.</dd>
+      </dl>
+
+      <h2 id="m-oci">Órganos de Control Institucional (OCI)</h2>
+      <p>Los jefes de OCI los designa la Contraloría, no la entidad, y se analizan en su propia pestaña. La sede de cada OCI se saca del texto de la norma: sin ella, cientos de OCI distintos quedarían como un solo puesto y parecería que se reemplazan entre sí.</p>
+
       <h2>Qué no incluye</h2>
-      <p>Los ministros (se analizan aparte), el Poder Judicial, el Ministerio Público, los representantes ante comisiones y consejos, los responsables de transparencia, los fedatarios, los prefectos y subprefectos. Tampoco hay contratos CAS ni locadores: solo lo que se publica en El Peruano. Los encargos temporales no cuentan para las duraciones.</p>
-      <h2>Límites</h2>
+      <p>Los ministros (se analizan aparte), el Poder Judicial, el Ministerio Público, los representantes ante comisiones, consejos y grupos de trabajo, los responsables de transparencia, los fedatarios, los prefectos y subprefectos. Los directorios y consejos directivos sí se incluyen. Tampoco hay contratos CAS ni locadores: solo lo que se publica en El Peruano.</p>
+
+      <h2 id="m-limites">Limitaciones</h2>
       <ul>
-        <li>Los nombres se unifican con reglas (tildes, segundo nombre, DNI cuando aparece). Puede haber dos personas unidas por error o una persona separada en dos.</li>
+        <li>Los ceses de personas designadas antes de 2020 no tienen fecha de inicio y quedan fuera de las duraciones.</li>
+        <li>Los cargos de asesor y miembro de directorio no tienen un único ocupante y no entran en la regla de sucesión.</li>
+        <li>Los nombres se unifican con reglas: puede haber dos personas unidas por error o una persona separada en dos.</li>
         <li>Cuando no se publica el cese, la salida se infiere por la llegada de un reemplazo o por un nuevo cargo de la misma persona.</li>
-        <li>Los jefes de los OCI los designa la Contraloría y se analizan por separado.</li>
+        <li>Es una primera pasada: los números pueden moverse a medida que se depure la base.</li>
       </ul>
+
+      <h2 id="m-glosario">Glosario</h2>
+      <dl>
+        <dt>Designación</dt><dd>Nombramiento en un cargo de confianza, que se puede terminar en cualquier momento.</dd>
+        <dt>Encargatura</dt><dd>Asignación temporal de funciones mientras el puesto no tiene titular.</dd>
+        <dt>Cese o conclusión</dt><dd>La entidad le pone fin a la designación.</dd>
+        <dt>Renuncia</dt><dd>La persona deja el cargo y la entidad acepta su renuncia.</dd>
+        <dt>Titular</dt><dd>Quien ocupa un puesto de un solo ocupante (un director, un jefe de oficina).</dd>
+        <dt>Periodo censurado</dt><dd>Un periodo que sigue abierto al corte: sabemos que duró al menos hasta hoy, pero no cuánto más.</dd>
+        <dt>Firmante</dt><dd>Quien firma la resolución (ministro, jefe o gerente de la entidad).</dd>
+        <dt>Episodio</dt><dd>Grupo de 3 o más personas que salen de la misma entidad y llegan juntas a otra.</dd>
+        <dt>OCI</dt><dd>Órgano de Control Institucional: la oficina de la Contraloría dentro de cada entidad.</dd>
+      </dl>
+
       <h2 id="descargas">Descargar datos</h2>
       <p class="descargas">${A.map((a) => `<a href="datos/${a}.json" download>${a}.json</a>`).join("")}</p>`;
+    // el índice desplaza la página sin cambiar el #hash (el hash guarda la pestaña)
+    $("#metodo-texto .indice").onclick = (e) => {
+      const a = e.target.closest("a[href^='#']");
+      if (!a) return;
+      e.preventDefault();
+      document.getElementById(a.getAttribute("href").slice(1))?.scrollIntoView({ behavior: "smooth" });
+    };
   }
 })();
