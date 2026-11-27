@@ -21,15 +21,14 @@
     { id: "mecanismos", nombre: "¿Cómo funcionan las rotaciones?" },
     { id: "redes", nombre: "Redes: ¿quién llega con quién?" },
     { id: "casos", nombre: "Funcionarios con muchas rotaciones" },
-    { id: "paralelos", nombre: "Cargos paralelos" },
     { id: "oci", nombre: "Jefes de control (OCI)" },
     { id: "metodo", nombre: "Cómo se hizo" },
   ];
   // en qué pestañas aplica cada filtro
   const APLICA = {
-    ent: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos"],
-    tipo: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos"],
-    gob: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos", "oci"],
+    ent: ["rotacion", "intercambio", "mecanismos", "redes", "casos"],
+    tipo: ["rotacion", "intercambio", "mecanismos", "redes", "casos"],
+    gob: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "oci"],
     nivel: ["rotacion", "intercambio", "mecanismos"],
   };
   const NIVELES = [
@@ -45,7 +44,7 @@
   let ctl = {};        // controles
 
   /* ------------------------------------------------ carga */
-  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "relaciones", "mecanismos", "oci", "paralelos"];
+  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "relaciones", "mecanismos", "oci"];
   Promise.all(ARCHIVOS.map((a) => fetch(`datos/${a}.json`).then((r) => { if (!r.ok) throw new Error(a); return r.json(); })))
     .then((res) => { ARCHIVOS.forEach((a, i) => (D[a] = res[i])); }, (e) => { mostrarError(`No se pudieron cargar los datos (${e.message}). Abre el tablero desde un servidor web, no como archivo local.`); throw e; })
     .then(iniciar)
@@ -154,10 +153,6 @@
     segmentado("#s1-metrica", "metrica");
     segmentado("#s4-red", "red", () => ({ detalleRed: null }));
     $("#s5-orden").onchange = (e) => cambiar({ orden: e.target.value, persona: null });
-    $("#i7-buscar").onchange = (e) => {
-      const p = D.personas.indexOf(e.target.value);
-      if (p >= 0 && D.paralelos.per[p]) cambiar({ parPersona: p, parTipo: null });
-    };
     $("#i5-buscar").onchange = (e) => {
       const p = D.personas.indexOf(e.target.value);
       if (p >= 0 && ctl.trayPorPersona.has(p)) cambiar({ persona: p });
@@ -209,7 +204,7 @@
     $("#error").hidden = true;
     sincronizar();
     ({ rotacion: dibujarRotacion, intercambio: dibujarIntercambio, mecanismos: dibujarMecanismos, redes: dibujarRedes,
-       casos: dibujarCasos, paralelos: dibujarParalelos, oci: dibujarOci, metodo: () => {} })[estado.modulo]();
+       casos: dibujarCasos, oci: dibujarOci, metodo: () => {} })[estado.modulo]();
   }
   const lectura = (id, html) => ($(id).innerHTML = html);
 
@@ -857,7 +852,7 @@
     $(`#${idLey}`).innerHTML = entsOrden.map((e) => `<span><i style="background:${colorE(e)}"></i>${esc(nombreEnt(e))}</span>`).join("");
   }
 
-  /* ================================================ 5b. Cargos paralelos */
+  /* ================================================ 5b. Cargos paralelos (sin pestaña por ahora: falta corregir; datos en paralelos.json) */
   const PAR = {
     adicion: { nombre: "«En adición a sus funciones»", seguro: true,
       def: "La resolución dice que la persona asume el nuevo cargo «en adición a sus funciones»: conserva el que tenía." },
@@ -995,13 +990,13 @@
 
   /* ================================================ 7. Método */
   function pintarMetodo() {
-    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "relaciones", "paralelos", "oci"];
+    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "relaciones", "oci"];
     const corte = esc(fmtCorte(D.meta.corte));
     $("#metodo-texto").innerHTML = `
       <nav class="indice" aria-label="Contenido de la metodología">
         <a href="#m-que">Qué medimos</a><a href="#m-fuente">Fuente</a><a href="#m-eventos">Eventos</a><a href="#m-dedup">Duplicados</a>
         <a href="#m-estandar">Estandarización</a><a href="#m-periodos">Periodos</a><a href="#m-medidas">Medidas</a>
-        <a href="#m-mecanismos">Mecanismos</a><a href="#m-redes">Redes</a><a href="#m-paralelos">Cargos paralelos</a><a href="#m-oci">OCI</a><a href="#m-limites">Límites</a>
+        <a href="#m-mecanismos">Mecanismos</a><a href="#m-redes">Redes</a><a href="#m-oci">OCI</a><a href="#m-limites">Límites</a>
         <a href="#m-glosario">Glosario</a><a href="#descargas">Descargas</a>
       </nav>
 
@@ -1075,13 +1070,6 @@
           <strong>solo coincidieron</strong>. Luego se compara la relación en la primera entidad con la de la siguiente (por ejemplo, colegas que pasan a ser jefe y subordinado). "Jefe" es una inferencia: estar en la alta dirección cuando designan a alguien no prueba que esa persona lo haya elegido.</dd>
         <dt>¿Es casualidad?</dt><dd>El azar del co-traslado y de las relaciones se calcula barajando 20 veces las fechas de llegada a cada entidad y contando cuántos pares saldrían. Si los datos reales tienen muchos más pares que las simulaciones, los grupos se mueven a propósito.</dd>
       </dl>
-
-      <h2 id="m-paralelos">Cargos paralelos</h2>
-      <p>Una persona tiene cargos paralelos cuando dos de sus periodos, en puestos distintos, se cruzan al menos 30 días. Cada cruce se clasifica por lo que lo respalda, en este orden:</p>
-      <dl>
-        ${Object.values(PAR).map((x) => `<dt>${esc(x.nombre)}${x.seguro ? "" : " (posible)"}</dt><dd>${esc(x.def)}</dd>`).join("")}
-      </dl>
-      <p>Los tres primeros están respaldados por la norma o por el tipo de cargo. Los dos últimos son posibles: cuando no se publica el fin de un cargo, el periodo queda abierto y puede parecer que la persona sigue en él. «Cargos a la vez» es el máximo de cargos que se cruzan en un mismo día. La duración del cruce va desde el inicio del segundo cargo hasta el fin del primero que termina; si los dos siguen, se cuenta hasta el corte.</p>
 
       <h2 id="m-oci">Órganos de Control Institucional (OCI)</h2>
       <p>Los jefes de OCI los designa la Contraloría, no la entidad, y se analizan en su propia pestaña. La sede de cada OCI se saca del texto de la norma: sin ella, cientos de OCI distintos quedarían como un solo puesto y parecería que se reemplazan entre sí.</p>
