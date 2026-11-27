@@ -21,14 +21,15 @@
     { id: "mecanismos", nombre: "¿Cómo funcionan las rotaciones?" },
     { id: "redes", nombre: "Redes: ¿quién llega con quién?" },
     { id: "casos", nombre: "Funcionarios con muchas rotaciones" },
+    { id: "paralelos", nombre: "Cargos paralelos" },
     { id: "oci", nombre: "Jefes de control (OCI)" },
     { id: "metodo", nombre: "Cómo se hizo" },
   ];
   // en qué pestañas aplica cada filtro
   const APLICA = {
-    ent: ["rotacion", "intercambio", "mecanismos", "redes", "casos"],
-    tipo: ["rotacion", "intercambio", "mecanismos", "redes", "casos"],
-    gob: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "oci"],
+    ent: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos"],
+    tipo: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos"],
+    gob: ["rotacion", "intercambio", "mecanismos", "redes", "casos", "paralelos", "oci"],
     nivel: ["rotacion", "intercambio", "mecanismos"],
   };
   const NIVELES = [
@@ -44,7 +45,7 @@
   let ctl = {};        // controles
 
   /* ------------------------------------------------ carga */
-  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "relaciones", "mecanismos", "oci"];
+  const ARCHIVOS = ["meta", "periodos", "mensual", "movimientos", "personas", "trayectorias", "seguimiento", "cotraslado", "relaciones", "mecanismos", "oci", "paralelos"];
   Promise.all(ARCHIVOS.map((a) => fetch(`datos/${a}.json`).then((r) => { if (!r.ok) throw new Error(a); return r.json(); })))
     .then((res) => { ARCHIVOS.forEach((a, i) => (D[a] = res[i])); }, (e) => { mostrarError(`No se pudieron cargar los datos (${e.message}). Abre el tablero desde un servidor web, no como archivo local.`); throw e; })
     .then(iniciar)
@@ -127,6 +128,7 @@
       tipo: new Set(Object.keys(D.meta.tipos)),
       gob: new Set(GOBS().map((_, i) => i)),
       nivel: "todos", metrica: "mediana", red: "seguimiento", persona: null, orden: "n", detalleRed: null, ruta: null,
+      parTipo: null, parPersona: null,
     };
     if (!MODULOS.some((m) => m.id === estado.modulo)) estado.modulo = "rotacion";
 
@@ -152,6 +154,10 @@
     segmentado("#s1-metrica", "metrica");
     segmentado("#s4-red", "red", () => ({ detalleRed: null }));
     $("#s5-orden").onchange = (e) => cambiar({ orden: e.target.value, persona: null });
+    $("#i7-buscar").onchange = (e) => {
+      const p = D.personas.indexOf(e.target.value);
+      if (p >= 0 && D.paralelos.per[p]) cambiar({ parPersona: p, parTipo: null });
+    };
     $("#i5-buscar").onchange = (e) => {
       const p = D.personas.indexOf(e.target.value);
       if (p >= 0 && ctl.trayPorPersona.has(p)) cambiar({ persona: p });
@@ -203,7 +209,7 @@
     $("#error").hidden = true;
     sincronizar();
     ({ rotacion: dibujarRotacion, intercambio: dibujarIntercambio, mecanismos: dibujarMecanismos, redes: dibujarRedes,
-       casos: dibujarCasos, oci: dibujarOci, metodo: () => {} })[estado.modulo]();
+       casos: dibujarCasos, paralelos: dibujarParalelos, oci: dibujarOci, metodo: () => {} })[estado.modulo]();
   }
   const lectura = (id, html) => ($(id).innerHTML = html);
 
@@ -813,33 +819,141 @@
     if (!tr) { Obs.vacio("g5-gantt"); $("#h5-persona").textContent = ""; $("#t5-periodos").innerHTML = ""; $("#ley5-gantt").innerHTML = ""; return; }
     const per = [...tr.per].sort((a, b) => a[3] - b[3]);
     $("#h5-persona").innerHTML = `${esc(D.personas[tr.p])} <small>· ${tr.n} cargos en ${tr.ne} entidades</small>`;
+    gantt("g5-gantt", "ley5-gantt", per);
+    const hoy = (Date.parse(D.meta.corte) - T0) / DIA;
+    $("#t5-periodos").innerHTML = `<table class="tabla"><thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Cargo</th><th>Oficina</th><th>Entidad</th><th>Cómo terminó</th></tr></thead><tbody>${
+      per.map((x) => `<tr><td>${fmtFecha(x[3])}</td><td>${x[4] == null ? "Sigue" : fmtFecha(x[4])}</td><td class="num">${n((x[4] ?? hoy) - x[3])}</td><td>${esc(x[1])}</td><td>${esc(x[2])}</td><td>${esc(nombreEnt(x[0]))}</td><td>${esc(D.meta.motivos[x[5]].nombre)}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // Gantt de los cargos de una persona: per = [[entidad, cargo, oficina, inicio, fin, motivo, ...]] ordenado por inicio
+  function gantt(id, idLey, per, etiquetaExtra = () => "", sinFin = () => false) {
+    const t = Obs.tema();
     const entsOrden = [...new Set(per.map((x) => x[0]))];
     // trayectoria: más entidades que colores categóricos; después de los 5 se usan otros colores de la marca
     const css = getComputedStyle(document.documentElement);
     const paleta = [...t.categorias, ...["--rosa", "--verde", "--azul-claro", "--rojo", "--navy"].map((v) => css.getPropertyValue(v).trim())];
     const colorE = (e) => paleta[entsOrden.indexOf(e)] ?? t.otros;
     const hoy = (Date.parse(D.meta.corte) - T0) / DIA;
-    const filas = per.map((x) => `${x[1]} · ${nombreEnt(x[0])}`);
-    const el = document.getElementById("g5-gantt");
+    const filas = per.map((x) => `${x[1]}${etiquetaExtra(x)} · ${nombreEnt(x[0])}`);
+    const el = document.getElementById(id);
     el.style.height = `${Math.max(220, per.length * 36 + 70)}px`;
-    const g = Obs.grafico("g5-gantt"); g.resize();
+    const g = Obs.grafico(id); g.resize();
     g.setOption({
       textStyle: { fontFamily: t.fuente },
-      tooltip: { ...Obs.tooltipBase(), formatter: (p) => { const x = per[p.value[0]]; return `<strong>${esc(x[1])}</strong><br>${esc(ENT()[x[0]].nombre)}${x[2] ? `<br>${esc(x[2])}` : ""}<br>${fmtFecha(x[3])} – ${x[4] == null ? "sigue" : fmtFecha(x[4])} (${n((x[4] ?? hoy) - x[3])} días)<br>${esc(D.meta.motivos[x[5]].nombre)}`; } },
+      tooltip: { ...Obs.tooltipBase(), formatter: (p) => { const x = per[p.value[0]]; return `<strong>${esc(x[1])}</strong><br>${esc(ENT()[x[0]].nombre)}${x[2] ? `<br>${esc(x[2])}` : ""}<br>` +
+        (sinFin(x) ? `Encargo desde ${fmtFecha(x[3])}; no se publicó cuándo terminó` : `${fmtFecha(x[3])} – ${x[4] == null ? "sigue" : fmtFecha(x[4])} (${n((x[4] ?? hoy) - x[3])} días)<br>${esc(D.meta.motivos[x[5]].nombre)}`); } },
       grid: { left: Math.min(300, el.clientWidth * 0.4), right: 20, top: 10, bottom: 40 },
       xAxis: { type: "time", min: T0, max: T0 + hoy * DIA, axisLabel: { fontSize: 14, color: t.textoSuave }, splitLine: { lineStyle: { color: t.linea } } },
       yAxis: { type: "category", data: filas, inverse: true, axisTick: { show: false }, axisLabel: { fontSize: 14, color: t.texto, width: Math.min(290, el.clientWidth * 0.4 - 10), overflow: "truncate" } },
       series: [{ type: "custom", encode: { x: [1, 2], y: 0 },
-        data: per.map((x, i) => ({ value: [i, T0 + x[3] * DIA, T0 + (x[4] ?? hoy) * DIA], itemStyle: { color: colorE(x[0]) } })),
+        data: per.map((x, i) => ({ value: [i, T0 + x[3] * DIA, T0 + (sinFin(x) ? Math.min(x[3] + 30, hoy) : x[4] ?? hoy) * DIA],
+          itemStyle: { color: colorE(x[0]), opacity: sinFin(x) ? 0.55 : 1 } })),
         renderItem: (params, api) => {
           const y = api.value(0), a = api.coord([api.value(1), y]), b = api.coord([api.value(2), y]);
           const h = api.size([0, 1])[1] * 0.6;
           return { type: "rect", shape: { x: a[0], y: a[1] - h / 2, width: Math.max(3, b[0] - a[0]), height: h, r: 2 }, style: api.style() };
         } }],
     }, true);
-    $("#ley5-gantt").innerHTML = entsOrden.map((e) => `<span><i style="background:${colorE(e)}"></i>${esc(nombreEnt(e))}</span>`).join("");
-    $("#t5-periodos").innerHTML = `<table class="tabla"><thead><tr><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Cargo</th><th>Oficina</th><th>Entidad</th><th>Cómo terminó</th></tr></thead><tbody>${
-      per.map((x) => `<tr><td>${fmtFecha(x[3])}</td><td>${x[4] == null ? "Sigue" : fmtFecha(x[4])}</td><td class="num">${n((x[4] ?? hoy) - x[3])}</td><td>${esc(x[1])}</td><td>${esc(x[2])}</td><td>${esc(nombreEnt(x[0]))}</td><td>${esc(D.meta.motivos[x[5]].nombre)}</td></tr>`).join("")}</tbody></table>`;
+    $(`#${idLey}`).innerHTML = entsOrden.map((e) => `<span><i style="background:${colorE(e)}"></i>${esc(nombreEnt(e))}</span>`).join("");
+  }
+
+  /* ================================================ 5b. Cargos paralelos */
+  const PAR = {
+    adicion: { nombre: "«En adición a sus funciones»", seguro: true,
+      def: "La resolución dice que la persona asume el nuevo cargo «en adición a sus funciones»: conserva el que tenía." },
+    encargo: { nombre: "Encargo junto a otro cargo", seguro: true,
+      def: "Uno de los dos es una encargatura: un encargo temporal que se suele asumir sin dejar el cargo propio." },
+    colegiado: { nombre: "Directorio o consejo junto a otro cargo", seguro: true,
+      def: "Uno de los dos es un puesto en un directorio, consejo o tribunal, que por su naturaleza se ocupa junto con otro cargo." },
+    asesor: { nombre: "Asesoría junto a otro cargo", seguro: false,
+      def: "Uno de los dos es una asesoría. Se puede ser asesor y tener otro cargo a la vez, pero también puede que no se haya publicado el fin de la asesoría." },
+    otro: { nombre: "Dos cargos sin cese publicado", seguro: false,
+      def: "Ninguna de las marcas anteriores. Lo más probable es que no se haya publicado el fin del primer cargo, así que es un cruce posible, no confirmado." },
+  };
+  function dibujarParalelos() {
+    const t = Obs.tema(), Pa = D.paralelos, TT = Pa.tipos;
+    const colSeg = t.unica, colPos = t.otros;
+    const colorTipo = (k) => (PAR[TT[k]].seguro ? colSeg : colPos);
+    const pares = Pa.pares.filter((p) => estado.gob.has(p[9]) && (!filtroEntActivo() || pasaEnt(p[2]) || pasaEnt(p[4])));
+    // por persona: tipos, cruces, si alguno está respaldado
+    const porP = new Map();
+    pares.forEach((p) => { if (!porP.has(p[0])) porP.set(p[0], []); porP.get(p[0]).push(p); });
+    const esSeg = (ps) => ps.some((p) => PAR[TT[p[1]]].seguro);
+    const nSeg = [...porP.values()].filter(esSeg).length, nPos = porP.size - nSeg;
+    const ds = pares.filter((p) => PAR[TT[p[1]]].seguro && p[8] != null).map((p) => p[8]).sort((a, b) => a - b);
+    const medD = ds.length ? ds[Math.floor(ds.length / 2)] : null;
+    Obs.kpi("k7-seguros", { etiqueta: "Personas con cargos paralelos respaldados", valor: n(nSeg), pie: "«En adición», encargos, directorios y consejos" });
+    Obs.kpi("k7-posibles", { etiqueta: "Personas con cruces posibles", valor: n(nPos), pie: "Asesorías y cargos sin cese publicado" });
+    Obs.kpi("k7-dias", { etiqueta: "Duración típica del cruce respaldado", valor: medD == null ? "—" : `${n(medD)} días`, pie: "Mediana; los que siguen, hasta el corte; sin los encargos sin fin publicado" });
+    lectura("#r7-resumen", porP.size
+      ? `En ${textoSeleccion()}, ${fuerte(n(porP.size))} personas tuvieron dos cargos que se cruzan al menos 30 días. En ${fuerte(n(nSeg))} el cruce lo respalda la norma («en adición a sus funciones») o el tipo de cargo (un encargo, un directorio o un consejo). En las otras ${n(nPos)} es posible, pero puede deberse a que no se publicó el fin del primer cargo.`
+      : "No hay cargos paralelos para esta selección.");
+
+    // tipos
+    const items = TT.map((k, i) => ({ clave: i, etiqueta: PAR[k].nombre, valor: new Set(pares.filter((p) => p[1] === i).map((p) => p[0])).size, color: colorTipo(i),
+      n: pares.filter((p) => p[1] === i).length }));
+    Obs.barras("g7-tipo", items, { ordenar: false, nombre: "Personas", detalle: (d) => `${n(d.n)} cruces`,
+      seleccion: estado.parTipo == null ? null : new Set([estado.parTipo]), alClic: (k) => cambiar({ parTipo: estado.parTipo === k ? null : k, parPersona: null }) });
+    $("#ley7-tipo").innerHTML = `<span><i style="background:${colSeg}"></i>Respaldado por la norma o el tipo de cargo</span><span><i style="background:${colPos}"></i>Posible (puede faltar el cese)</span>`;
+    $("#def7-tipo").innerHTML = estado.parTipo == null
+      ? `<strong>Cargo paralelo:</strong> la misma persona en dos puestos distintos cuyos periodos se cruzan al menos 30 días. Cada cruce se clasifica por lo que lo respalda, en el orden de las barras. Clic en una barra para ver su definición.`
+      : `<strong>${esc(PAR[TT[estado.parTipo]].nombre)}:</strong> ${esc(PAR[TT[estado.parTipo]].def)}`;
+    const top = items.filter((d) => d.valor).sort((a, b) => b.valor - a.valor)[0];
+    lectura("#lec7-tipo", top ? `El tipo más frecuente es ${fuerte(top.etiqueta.toLowerCase())}: ${fuerte(n(top.valor))} personas. Una persona puede tener cruces de más de un tipo.` : "");
+
+    // por año: personas que empezaron un cargo paralelo (respaldado tiene prioridad)
+    const anios = [...new Set(Pa.pares.map((p) => anioDe(p[6])))].sort();
+    const seg = anios.map(() => new Set()), pos = anios.map(() => new Set());
+    pares.forEach((p) => { const i = anios.indexOf(anioDe(p[6])); (PAR[TT[p[1]]].seguro ? seg : pos)[i].add(p[0]); });
+    pos.forEach((s, i) => seg[i].forEach((x) => s.delete(x)));
+    const g = Obs.grafico("g7-anio");
+    g.setOption({
+      textStyle: { fontFamily: t.fuente }, tooltip: { ...Obs.tooltipBase(), trigger: "axis", axisPointer: { type: "shadow", shadowStyle: { color: "rgba(4,35,85,.05)" } } },
+      grid: { left: 52, right: 12, top: 28, bottom: 30 },
+      xAxis: { type: "category", data: anios.map(String), axisTick: { show: false }, axisLine: { lineStyle: { color: t.linea } }, axisLabel: { fontSize: 14, color: t.textoSuave } },
+      yAxis: { type: "value", splitLine: { lineStyle: { color: t.linea } }, axisLabel: { fontSize: 14, color: t.textoSuave } },
+      series: [
+        { name: "Respaldado", type: "bar", stack: "a", barCategoryGap: "22%", data: seg.map((s) => s.size), itemStyle: { color: colSeg } },
+        { name: "Posible", type: "bar", stack: "a", data: pos.map((s) => s.size), itemStyle: { color: colPos, borderRadius: [2, 2, 0, 0] },
+          label: { show: true, position: "top", fontSize: 14, fontWeight: 700, color: t.texto, formatter: (p) => n(seg[p.dataIndex].size + p.value) } },
+      ],
+    }, true);
+    $("#ley7-anio").innerHTML = $("#ley7-tipo").innerHTML;
+    const ult = anios.length - 1;
+    lectura("#lec7-anio", anios.length ? `${anios[ult]} va con ${fuerte(n(seg[ult].size + pos[ult].size))} personas al ${esc(fmtCorte(D.meta.corte))}. Los cruces recientes pesan más porque los cargos que siguen abiertos todavía no tienen salida publicada.` : "");
+
+    // entidades
+    const porE = new Map();
+    pares.forEach((p) => [p[2], p[4]].forEach((e) => { if (!pasaEnt(e)) return; if (!porE.has(e)) porE.set(e, { s: new Set(), seg: new Set() }); porE.get(e).s.add(p[0]); if (PAR[TT[p[1]]].seguro) porE.get(e).seg.add(p[0]); }));
+    const ents = [...porE].map(([e, v]) => ({ clave: e, etiqueta: nombreEnt(e), valor: v.s.size, seg: v.seg.size }));
+    Obs.barras("g7-ent", ents, { limite: 15, nombre: "Personas", detalle: (d) => `${n(d.seg)} con cruce respaldado`,
+      seleccion: todasEnt() ? null : estado.ent, alClic: (e) => cambiar({ ent: new Set([e]) }) });
+    const e0 = [...ents].sort((a, b) => b.valor - a.valor)[0];
+    lectura("#lec7-ent", e0 ? `${fuerte(esc(e0.etiqueta))} encabeza la lista con ${fuerte(n(e0.valor))} personas; en ${n(e0.seg)} el cruce está respaldado.` : "");
+
+    // tabla de personas
+    let filas = [...porP].filter(([, ps]) => estado.parTipo == null || ps.some((x) => x[1] === estado.parTipo))
+      .map(([p, ps]) => ({ p, ps, sim: Pa.sim[p] ?? 2, seg: esSeg(ps), ents: new Set(ps.flatMap((x) => [x[2], x[4]])).size }))
+      .sort((a, b) => b.seg - a.seg || b.sim - a.sim || b.ps.length - a.ps.length);
+    $("#p7-tabla").textContent = `${n(filas.length)} personas${estado.parTipo == null ? "" : ` con «${PAR[TT[estado.parTipo]].nombre.toLowerCase()}»`}. Primero las de cruce respaldado. Clic en una persona para ver sus cargos en el tiempo.`;
+    $("#l7-personas").innerHTML = filas.slice(0, 3000).map((f) => `<option value="${esc(D.personas[f.p])}">`).join("");
+    if (estado.parPersona == null || !Pa.per[estado.parPersona]) estado.parPersona = filas[0]?.p ?? null;
+    $("#t7-personas").innerHTML = filas.length ? `<table class="tabla"><thead><tr><th>Persona</th><th class="num">Cargos a la vez</th><th class="num">Cruces</th><th>Tipo</th><th>Entidades</th></tr></thead><tbody>${
+      filas.slice(0, 50).map((f) => `<tr data-p="${f.p}" class="${f.p === estado.parPersona ? "elegida" : ""}" style="cursor:pointer"><td>${esc(D.personas[f.p])}</td><td class="num">${f.sim}</td><td class="num">${f.ps.length}</td><td>${esc([...new Set(f.ps.map((x) => PAR[TT[x[1]]].nombre))].join("; "))}</td><td>${esc([...new Set(f.ps.flatMap((x) => [x[2], x[4]]))].map(nombreEnt).join(", "))}</td></tr>`).join("")}</tbody></table>` +
+      (filas.length > 50 ? `<p class="pista">Se muestran 50 de ${n(filas.length)}. Usa el buscador para ver a otra persona.</p>` : "") : "";
+    $("#t7-personas").onclick = (e) => { const tr = e.target.closest("tr[data-p]"); if (tr) cambiar({ parPersona: +tr.dataset.p }); };
+
+    // gantt y cruces de la persona elegida
+    const p = estado.parPersona;
+    if (p == null) { Obs.vacio("g7-gantt"); $("#h7-persona").textContent = ""; $("#t7-cruces").innerHTML = ""; $("#ley7-gantt").innerHTML = ""; return; }
+    const per = Pa.per[p];
+    const marca = (x) => (x[7] ? " (en adición)" : x[8] ? " (encargo)" : x[9] ? " (directorio/consejo)" : "");
+    $("#h7-persona").innerHTML = `${esc(D.personas[p])} <small>· ${per.length} cargos desde 2020</small>`;
+    gantt("g7-gantt", "ley7-gantt", per, marca, (x) => x[11] === 1);
+    const cr = Pa.pares.filter((x) => x[0] === p);
+    $("#t7-cruces").innerHTML = `<table class="tabla"><thead><tr><th>Primer cargo</th><th>Segundo cargo</th><th>Desde</th><th>Hasta</th><th class="num">Días</th><th>Tipo</th></tr></thead><tbody>${
+      cr.map((x) => `<tr><td>${esc(x[3])} · ${esc(nombreEnt(x[2]))}</td><td>${esc(x[5])} · ${esc(nombreEnt(x[4]))}</td><td>${fmtFecha(x[6])}</td><td>${x[8] == null ? "Sin fin publicado" : x[7] == null ? "Sigue" : fmtFecha(x[7])}</td><td class="num">${x[8] == null ? "—" : n(x[8])}</td><td>${esc(PAR[TT[x[1]]].nombre)}${x[12] > 1 ? ` (${x[12]} veces)` : ""}</td></tr>`).join("")}</tbody></table>` +
+      (cr.some((x) => x[8] == null) ? `<p class="pista">«Sin fin publicado»: el encargo dice que dura «en tanto dure la ausencia del titular» u otra fórmula parecida y no se publicó cuándo terminó. En el gráfico se dibuja como una marca corta.</p>` : "");
   }
 
   /* ================================================ 6. OCI */
@@ -881,13 +995,13 @@
 
   /* ================================================ 7. Método */
   function pintarMetodo() {
-    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "relaciones", "oci"];
+    const A = ["meta", "periodos", "movimientos", "trayectorias", "seguimiento", "cotraslado", "relaciones", "paralelos", "oci"];
     const corte = esc(fmtCorte(D.meta.corte));
     $("#metodo-texto").innerHTML = `
       <nav class="indice" aria-label="Contenido de la metodología">
         <a href="#m-que">Qué medimos</a><a href="#m-fuente">Fuente</a><a href="#m-eventos">Eventos</a><a href="#m-dedup">Duplicados</a>
         <a href="#m-estandar">Estandarización</a><a href="#m-periodos">Periodos</a><a href="#m-medidas">Medidas</a>
-        <a href="#m-mecanismos">Mecanismos</a><a href="#m-redes">Redes</a><a href="#m-oci">OCI</a><a href="#m-limites">Límites</a>
+        <a href="#m-mecanismos">Mecanismos</a><a href="#m-redes">Redes</a><a href="#m-paralelos">Cargos paralelos</a><a href="#m-oci">OCI</a><a href="#m-limites">Límites</a>
         <a href="#m-glosario">Glosario</a><a href="#descargas">Descargas</a>
       </nav>
 
@@ -926,7 +1040,7 @@
       <ol>
         <li><strong>Cese o renuncia publicados</strong>: se busca la salida de esa persona en ese mismo puesto; si la oficina está escrita distinto, se acepta la más parecida dentro de la misma entidad.</li>
         <li><strong>Llegó un reemplazo</strong>: si no se publicó la salida, el periodo se cierra cuando otra persona es designada en el mismo puesto. Solo vale para puestos de un único ocupante.</li>
-        <li><strong>Pasó a otro cargo</strong>: si la persona es designada en otro puesto titular, el periodo anterior se cierra ahí (solo si eso ocurre al menos 30 días antes que la otra salida posible).</li>
+        <li><strong>Pasó a otro cargo</strong>: si la persona es designada en otro puesto, el periodo anterior se cierra ahí (solo si eso ocurre al menos 30 días antes que la otra salida posible). No cierran el cargo anterior las designaciones «en adición a sus funciones», los encargos, los puestos en directorios, consejos o tribunales ni las asesorías, porque se pueden tener junto con otro cargo. Una asesoría solo se cierra así cuando la persona pasa a un cargo directivo titular.</li>
         <li><strong>Sigue en el cargo</strong>: si nada de lo anterior ocurre, el periodo queda abierto al ${corte}.</li>
       </ol>
       <p>Dos periodos seguidos de la misma persona en el mismo puesto, separados por 15 días o menos, se unen en uno. Las encargaturas no cuentan para las duraciones.</p>
@@ -961,6 +1075,13 @@
           <strong>solo coincidieron</strong>. Luego se compara la relación en la primera entidad con la de la siguiente (por ejemplo, colegas que pasan a ser jefe y subordinado). "Jefe" es una inferencia: estar en la alta dirección cuando designan a alguien no prueba que esa persona lo haya elegido.</dd>
         <dt>¿Es casualidad?</dt><dd>El azar del co-traslado y de las relaciones se calcula barajando 20 veces las fechas de llegada a cada entidad y contando cuántos pares saldrían. Si los datos reales tienen muchos más pares que las simulaciones, los grupos se mueven a propósito.</dd>
       </dl>
+
+      <h2 id="m-paralelos">Cargos paralelos</h2>
+      <p>Una persona tiene cargos paralelos cuando dos de sus periodos, en puestos distintos, se cruzan al menos 30 días. Cada cruce se clasifica por lo que lo respalda, en este orden:</p>
+      <dl>
+        ${Object.values(PAR).map((x) => `<dt>${esc(x.nombre)}${x.seguro ? "" : " (posible)"}</dt><dd>${esc(x.def)}</dd>`).join("")}
+      </dl>
+      <p>Los tres primeros están respaldados por la norma o por el tipo de cargo. Los dos últimos son posibles: cuando no se publica el fin de un cargo, el periodo queda abierto y puede parecer que la persona sigue en él. «Cargos a la vez» es el máximo de cargos que se cruzan en un mismo día. La duración del cruce va desde el inicio del segundo cargo hasta el fin del primero que termina; si los dos siguen, se cuenta hasta el corte.</p>
 
       <h2 id="m-oci">Órganos de Control Institucional (OCI)</h2>
       <p>Los jefes de OCI los designa la Contraloría, no la entidad, y se analizan en su propia pestaña. La sede de cada OCI se saca del texto de la norma: sin ella, cientos de OCI distintos quedarían como un solo puesto y parecería que se reemplazan entre sí.</p>

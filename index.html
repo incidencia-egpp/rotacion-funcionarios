@@ -225,6 +225,51 @@
       </article>
     </section>
 
+    <!-- 5b. Cargos paralelos -->
+    <section data-modulo="paralelos" hidden>
+      <p class="resumen" id="r7-resumen"></p>
+      <div class="kpis">
+        <div class="kpi" id="k7-seguros"></div><div class="kpi" id="k7-posibles"></div><div class="kpi" id="k7-dias"></div>
+      </div>
+      <div class="grilla">
+        <article class="tarjeta">
+          <header><h3>¿De qué tipo son los cargos paralelos?</h3>
+            <p>Personas con dos cargos que se cruzan al menos 30 días, según lo que respalda el cruce. Clic en una barra para filtrar la tabla.</p></header>
+          <div class="definicion" id="def7-tipo" aria-live="polite"></div>
+          <div class="leyenda" id="ley7-tipo"></div>
+          <div class="grafico" id="g7-tipo"></div>
+          <p class="lectura" id="lec7-tipo"></p>
+        </article>
+        <article class="tarjeta">
+          <header><h3>¿Cuándo empezaron?</h3>
+            <p>Personas que asumieron un segundo cargo cada año, sin soltar el primero.</p></header>
+          <div class="leyenda" id="ley7-anio"></div>
+          <div class="grafico" id="g7-anio"></div>
+          <p class="lectura" id="lec7-anio"></p>
+        </article>
+      </div>
+      <article class="tarjeta">
+        <header><h3>Entidades donde más personas tienen cargos paralelos</h3>
+          <p>Personas con al menos un cruce en la entidad (en cualquiera de los dos cargos). Clic en una barra para filtrar el tablero por esa entidad.</p></header>
+        <div class="grafico" id="g7-ent"></div>
+        <p class="lectura" id="lec7-ent"></p>
+      </article>
+      <article class="tarjeta">
+        <header><h3>Personas con más de un cargo al mismo tiempo</h3>
+          <p id="p7-tabla">Clic en una persona para ver sus cargos en el tiempo.</p></header>
+        <div class="controles">
+          <div class="filtro-local"><label for="i7-buscar">Buscar persona</label>
+            <input id="i7-buscar" class="buscador" list="l7-personas" placeholder="Escribe un nombre…" autocomplete="off">
+            <datalist id="l7-personas"></datalist></div>
+        </div>
+        <div class="tabla-caja" id="t7-personas"></div>
+        <h4 class="nombre-persona" id="h7-persona"></h4>
+        <div class="grafico" id="g7-gantt"></div>
+        <div class="leyenda" id="ley7-gantt"></div>
+        <div class="tabla-caja" id="t7-cruces"></div>
+      </article>
+    </section>
+
     <!-- 6. OCI -->
     <section data-modulo="oci" hidden>
       <p class="resumen" id="r6-resumen"></p>
